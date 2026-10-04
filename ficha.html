@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ficha del contenedor | Cuarteo</title>
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Bricolage+Grotesque:opsz,wght@12..96,700..800&display=swap">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css">
+<style>
+:root{--paper:#F1F5EF;--surface:#fff;--sunk:#E6ECE3;--ink:#14302A;--ink-2:#4B605A;--ink-3:#7B8C86;--line:#D2DBD0;--leaf:#1E7A57;--leaf-ink:#fff;--leaf-soft:#DBEEE2;
+  --f-d:"Bricolage Grotesque","Trebuchet MS",system-ui,sans-serif;--f-b:"Atkinson Hyperlegible","Segoe UI",system-ui,sans-serif;color-scheme:light}
+@media (prefers-color-scheme:dark){:root{--paper:#0E1916;--surface:#15231F;--sunk:#1C2D28;--ink:#E2EDE7;--ink-2:#A6BAB2;--ink-3:#7A8F87;--line:#2A3C36;--leaf:#4DBB8C;--leaf-ink:#06130E;--leaf-soft:#18372B;color-scheme:dark}}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.5 var(--f-b);-webkit-font-smoothing:antialiased}
+main{max-width:560px;margin:0 auto;padding:calc(18px + env(safe-area-inset-top,0px)) 18px calc(28px + env(safe-area-inset-bottom,0px))}
+.top{display:flex;align-items:center;gap:10px;margin-bottom:20px}
+.top b{font:800 20px var(--f-d)}
+.top span{color:var(--ink-3);font-size:14px;margin-left:auto}
+.card{background:var(--surface);border:1.5px solid var(--line);border-radius:18px;padding:18px;overflow:hidden}
+.head{display:flex;gap:14px;align-items:center}
+.code{font:800 28px var(--f-d);padding:10px 14px;border-radius:12px;background:var(--ink);color:var(--paper);flex:none}
+h1{font:800 24px/1.15 var(--f-d);margin:0;letter-spacing:-.01em}
+.sub{color:var(--ink-2);margin:4px 0 0;font-size:15px}
+dl{display:grid;grid-template-columns:1fr 1fr;gap:14px 16px;margin:18px 0 0}
+dt{font-size:12.5px;font-weight:700;color:var(--ink-3)}
+dd{margin:2px 0 0;font-size:15px}
+.full{grid-column:1/-1}
+#map{height:240px;border-radius:12px;margin-top:18px;border:1.5px solid var(--line);background:var(--sunk)}
+.acts{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px}
+.btn{display:flex;align-items:center;justify-content:center;min-height:46px;border-radius:999px;border:1.5px solid var(--leaf);background:var(--leaf);color:var(--leaf-ink);font:700 15px var(--f-b);text-decoration:none;text-align:center;padding:0 12px}
+.btn.ghost{background:transparent;color:var(--ink);border-color:var(--line)}
+.note{color:var(--ink-3);font-size:13.5px;margin:16px 2px 0}
+.empty{padding:30px 6px;color:var(--ink-2)}
+</style>
+</head>
+<body>
+<main id="app"></main>
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+(function(){
+  'use strict';
+  var esc = function(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); };
+  var logo = '<svg width="30" height="30" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="13" fill="none" stroke="currentColor" stroke-width="2"/><path d="M16 16V3a13 13 0 0 0-13 13z" fill="var(--leaf)"/><path d="M16 16v13a13 13 0 0 0 13-13z" fill="var(--leaf)"/><path d="M16 3v26M3 16h26" stroke="currentColor" stroke-width="2"/></svg>';
+  var q = new URLSearchParams((location.hash || '').replace(/^#/, ''));
+  var d = {c:q.get('c'), n:q.get('n'), t:q.get('t'), s:q.get('s'), b:q.get('b'), ub:q.get('ub'), tu:q.get('tu'), e:q.get('e'), en:q.get('en'), m:q.get('m'), p:q.get('p'), la:parseFloat(q.get('la')), lo:parseFloat(q.get('lo'))};
+  var hasXY = isFinite(d.la) && isFinite(d.lo);
+  var app = document.getElementById('app');
+  var top = '<div class="top">' + logo + '<b>Cuarteo</b><span>Ficha del contenedor</span></div>';
+  if (!d.c) {
+    app.innerHTML = top + '<div class="card empty"><h1>Sin datos de contenedor</h1><p>Esta página muestra la ficha de un contenedor cuando se abre desde una etiqueta QR generada con Cuarteo.</p></div>';
+    return;
+  }
+  document.title = 'Contenedor ' + d.c + (d.n ? ', ' + d.n : '') + ' | Cuarteo';
+  var sub = [d.t, d.s].filter(Boolean).join(', ');
+  var ubi = [d.m, d.p].filter(Boolean).join(', ');
+  var html = top + '<div class="card"><div class="head"><div class="code">' + esc(d.c) + '</div><div><h1>' + esc(d.n || 'Contenedor') + '</h1>' + (sub ? '<p class="sub">' + esc(sub) + '</p>' : '') + '</div></div><dl>';
+  var ub = d.ub ? d.ub.charAt(0).toUpperCase() + d.ub.slice(1) : 'Población';
+  if (d.b) html += '<div><dt>' + esc(ub) + ' que atiende</dt><dd>' + esc(d.b) + '</dd></div>';
+  if (d.tu) html += '<div><dt>Turno habitual</dt><dd>' + esc(d.tu) + '</dd></div>';
+  if (d.e) html += '<div class="full"><dt>Estudio</dt><dd>' + esc(d.e) + '</dd></div>';
+  if (d.en) html += '<div class="full"><dt>Entidad</dt><dd>' + esc(d.en) + '</dd></div>';
+  if (ubi) html += '<div><dt>Municipio</dt><dd>' + esc(ubi) + '</dd></div>';
+  if (hasXY) html += '<div><dt>Coordenadas</dt><dd>' + d.la.toFixed(5) + ', ' + d.lo.toFixed(5) + '</dd></div>';
+  html += '</dl>';
+  if (hasXY) {
+    html += '<div id="map" role="img" aria-label="Mapa de ubicación del contenedor"></div><div class="acts">'
+      + '<a class="btn" href="https://www.google.com/maps/dir/?api=1&destination=' + d.la + ',' + d.lo + '" target="_blank" rel="noopener">Cómo llegar</a>'
+      + '<a class="btn ghost" href="https://www.google.com/maps/search/?api=1&query=' + d.la + ',' + d.lo + '" target="_blank" rel="noopener">Ver en Google Maps</a></div>';
+  }
+  html += '</div><p class="note">Datos registrados en la fuente al generar la etiqueta. Los pesos y las muestras se consultan en Cuarteo.</p>';
+  app.innerHTML = html;
+  if (hasXY && window.L) {
+    var dark = window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches;
+    var map = L.map('map', {zoomControl:true, scrollWheelZoom:false}).setView([d.la, d.lo], 16);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/' + (dark ? 'dark_all' : 'rastertiles/voyager') + '/{z}/{x}/{y}{r}.png', {subdomains:'abcd', maxZoom:20, attribution:'&copy; colaboradores de OpenStreetMap &copy; CARTO'}).addTo(map);
+    L.circleMarker([d.la, d.lo], {radius:10, color:'#ffffff', weight:3, fillColor:'#1E7A57', fillOpacity:1}).addTo(map).bindTooltip(esc(d.c), {permanent:true, direction:'right', offset:[10, 0]});
+  }
+})();
+</script>
+</body>
+</html>
