@@ -392,6 +392,11 @@ dialog.wide{width:min(920px,96vw)}
 .g-plbl span{position:absolute;transform:translate(-50%,-50%);font:700 11px/1.1 var(--f-b);color:var(--ink-3);white-space:nowrap;pointer-events:none}
 .g-city span{position:absolute;left:-4px;top:-8px;display:flex;align-items:center;gap:5px;white-space:nowrap;font:700 11.5px/16px var(--f-b);color:var(--ink);text-shadow:0 0 3px var(--surface),0 0 3px var(--surface);pointer-events:none}
 .g-city span::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--ink);box-shadow:0 0 0 1.5px var(--surface);flex:none}
+/* ---------- V 1.7: privacidad ---------- */
+.priv h4{margin:16px 0 4px;font-size:15px}
+.priv p,.priv li{font-size:14.5px;color:var(--ink-2);margin:4px 0}
+.priv ul{margin:4px 0;padding-left:20px}
+.lgfoot{margin-top:18px;font-size:13.5px;color:var(--ink-3)}
 /* ---------- V 1.6: acceso ---------- */
 .login{max-width:520px;padding:24px 0}
 .lgbrand{display:flex;gap:14px;align-items:center;margin-bottom:14px}
@@ -646,8 +651,9 @@ const CATCOL = {
 const unidad = c => UNIDADES.find(u => u[0] === c.unidadBase) || UNIDADES[0];
 const unidadCorta = c => unidad(c)[1];
 const unidadPlural = c => unidad(c)[2];
-const APP_VERSION = 'V 1.6';
+const APP_VERSION = 'V 1.7';
 const CHANGELOG = [
+  ['V 1.7', 'Aviso de privacidad con aceptación obligatoria al crear la cuenta (y una sola vez para las cuentas existentes); opción Eliminar mi cuenta, que borra de forma permanente la cuenta, los estudios, los ajustes y las fotos.'],
   ['V 1.6', 'Versión para publicar en GitHub con Supabase: inicio de sesión, estudios, ajustes y fotos en la nube. Fuera de Claude, el QR abre la app en el navegador con la ficha del contenedor y, con sesión iniciada, sus muestras. Respaldo con fotos para migrar datos entre espacios.'],
   ['V 1.5', 'Las etiquetas QR llevan todos los datos de la fuente (código, nombre, tipo, estrato o área, población o unidad base, turno, municipio, coordenadas, estudio y entidad) y se pueden generar como ficha web o como texto que no necesita internet; vista previa de lo que verá quien escanee; etiquetas con QR más grande.'],
   ['V 1.4', 'Mapa de calles (CARTO) y satelital (Esri) en lugar de los mosaicos de OpenStreetMap, que bloqueaban la app; selector Calles, Satélite y Límites; mapa con calles en el PDF; etiquetas QR que abren una ficha pública del contenedor sin pasar por Claude; opción de mapa personalizado.'],
@@ -1012,6 +1018,18 @@ const Store = {
     S.campanas = (r.data || []).map(x => x.data).filter(x => x && x.id);
   },
   photoPath(id){ return `${this.user.id}/${id}.jpg`; },
+  async deleteAccount(){
+    const uid = this.user.id; const bucket = this.sb.storage.from('fotos');
+    for (let guard = 0; guard < 60; guard++) {
+      const {data, error} = await bucket.list(uid, {limit:100}); if (error) throw new Error('No se pudieron borrar las fotos: ' + error.message);
+      if (!data || !data.length) break;
+      const {error:e2} = await bucket.remove(data.map(o => `${uid}/${o.name}`)); if (e2) throw new Error('No se pudieron borrar las fotos: ' + e2.message);
+    }
+    const {error} = await this.sb.rpc('eliminar_mi_cuenta');
+    if (error) throw new Error(/function|could not find|does not exist|schema cache/i.test(error.message) ? 'Falta actualizar la base de datos: ejecuta otra vez el archivo supabase-cuarteo.sql en Supabase.' : 'No se pudo eliminar la cuenta: ' + error.message);
+    try { await this.sb.auth.signOut(); } catch (e) {}
+    for (const k of Object.keys(PHOTO)) delete PHOTO[k];
+  },
   async load(){
     const cs = await this.db.doc('data/users/' + this.uid + '/config').get();
     if (cs.exists) applyConfig(clone(cs.data()));
@@ -1585,6 +1603,32 @@ function renderMain(){
 }
 function hydratePhotos(){ document.querySelectorAll('img[data-photo]').forEach(async img => { const d = await Store.getPhoto(img.dataset.photo); if (d) img.src = d; }); }
 
+/* ----- aviso de privacidad ----- */
+const PRIV_VERSION = '1.0, octubre de 2026';
+function privConf(){ const c = (window.CUARTEO_CONFIG && window.CUARTEO_CONFIG.privacidad) || {};
+  const r = String(c.responsable || '').trim(), m = String(c.contacto || '').trim();
+  return {resp:/tu nombre/i.test(r) ? '' : r, mail:/tu-correo|ejemplo\.com/i.test(m) ? '' : m}; }
+function privacyHTML(){
+  const {resp, mail} = privConf(); const who = resp ? `<b>${esc(resp)}</b>` : 'el administrador de esta instalación de Cuarteo';
+  const contact = mail ? `<a href="mailto:${esc(mail)}">${esc(mail)}</a>` : 'el administrador que te dio acceso';
+  return `<div class="priv"><p class="hint">Versión ${PRIV_VERSION}</p>
+    <h4>Responsable</h4><p>El responsable de los datos personales tratados en esta instalación de Cuarteo es ${who}. Contacto: ${contact}.</p>
+    <h4>Qué datos recogemos</h4><ul><li>Datos de la cuenta: correo electrónico y contraseña. La contraseña se guarda cifrada y nadie puede leerla.</li><li>Registros técnicos de acceso, como la fecha de registro, la fecha del último inicio de sesión y datos de conexión que generan los servicios de alojamiento.</li><li>La información que tú registras: estudios, fuentes, muestras, coordenadas GPS, resultados de laboratorio, ajustes y fotos.</li></ul>
+    <h4>Para qué los usamos</h4><p>Para darte acceso a la aplicación, guardar y sincronizar tus estudios entre equipos, generar tus informes y dar soporte técnico. No los usamos para publicidad ni los vendemos.</p>
+    <h4>Dónde se guardan</h4><p>En los servicios de Supabase (base de datos, autenticación y almacenamiento de fotos), cuyos servidores pueden estar fuera de la República Dominicana. El código de la aplicación se publica en GitHub, que no recibe tus datos. Los mapas se cargan desde CARTO y Esri, que solo reciben la zona del mapa que se está viendo.</p>
+    <h4>Quién puede verlos</h4><p>Cada usuario solo puede ver y modificar sus propios estudios y fotos. El administrador del proyecto puede acceder a los datos para mantenimiento y soporte, y está obligado a protegerlos. No se comparten con terceros, salvo obligación legal.</p>
+    <h4>Las etiquetas QR son públicas</h4><p>Los datos que escribes en una fuente (código, nombre, tipo, estrato o área, población, turno, ubicación, estudio y entidad) viajan dentro de su etiqueta QR y los puede leer cualquiera que la escanee. No incluyas nombres de personas ni direcciones de viviendas.</p>
+    <h4>Cuánto tiempo los conservamos</h4><p>Mientras tu cuenta esté activa. Al eliminarla se borran de forma permanente tu cuenta, tus estudios, tus ajustes y tus fotos. Los respaldos que descargues quedan bajo tu control.</p>
+    <h4>Tus derechos</h4><p>Conforme a la Ley 172-13 sobre protección de datos personales puedes acceder a tus datos, corregirlos, pedir su eliminación u oponerte a su tratamiento. Desde la app puedes descargar un respaldo con todos tus datos, editarlos y eliminar tu cuenta en Ajustes. Para cualquier otra solicitud escribe a ${contact}.</p>
+    <h4>Seguridad</h4><p>Las conexiones van cifradas, las contraseñas se guardan cifradas y las reglas de la base de datos impiden que un usuario vea los datos de otro.</p>
+    <h4>Cambios</h4><p>Si este aviso cambia, la aplicación te pedirá que lo aceptes de nuevo.</p></div>`;
+}
+function askConsent(){
+  S.consentPending = true;
+  openModal('Aviso de privacidad', `<p>Antes de seguir, lee y acepta el aviso de privacidad de Cuarteo.</p>${privacyHTML()}`,
+    `<button class="btn ghost" data-act="consentNo">No acepto</button><button class="btn" data-act="consentYes">Acepto</button>`, 'wide');
+}
+
 /* ----- acceso (Supabase) ----- */
 function acctHTML(){ return Store.mode === 'supa' && Store.user ? `<div class="acct"><span>Sesión iniciada</span><b>${esc(Store.user.email || '')}</b><button class="lnk" data-act="logout">Cerrar sesión</button></div>` : ''; }
 const lgMsg = t => { const el = $('#lgMsg'); if (el) el.textContent = t; };
@@ -1608,15 +1652,22 @@ function viewLogin(){
   const ficha = d ? `<div class="sitem" style="padding:16px;margin-bottom:8px;max-width:640px">${fichaPreviewHTML(d)}${d.la != null && d.lo != null ? `<div class="acts" style="margin-top:14px"><a class="btn" href="https://www.google.com/maps/dir/?api=1&destination=${d.la},${d.lo}" target="_blank" rel="noopener">Cómo llegar</a><a class="btn ghost" href="https://www.google.com/maps/search/?api=1&query=${d.la},${d.lo}" target="_blank" rel="noopener">Ver en Google Maps</a></div>` : ''}<p class="hint" style="margin-top:12px">Inicia sesión para ver las muestras de este contenedor y registrar nuevas.</p></div>` : '';
   return `${ficha}<div class="login">${d ? '' : brandHTML()}<p class="lede">${d ? 'Iniciar sesión en Cuarteo' : 'Inicia sesión para ver tus estudios.'}</p>
     <div class="lgform"><div class="fld"><label for="lgEmail">Correo</label><div class="inp"><input id="lgEmail" type="email" autocomplete="username" inputmode="email"></div></div>
-    <div class="fld"><label for="lgPass">Contraseña</label><div class="inp"><input id="lgPass" type="password" autocomplete="current-password"></div></div></div>
-    <div class="acts" style="margin-top:16px"><button class="btn" data-act="login">Entrar</button><button class="btn ghost" data-act="signup">Crear cuenta</button><button class="btn ghost" data-act="resetPass">Olvidé mi contraseña</button></div>
-    <p class="hint" id="lgMsg" role="status"></p></div>`;
+    <div class="fld"><label for="lgPass">Contraseña</label><div class="inp"><input id="lgPass" type="password" autocomplete="current-password"></div></div>
+    <label class="chkl" style="font-weight:400;font-size:14.5px"><input type="checkbox" id="lgAcepto"><span>He leído y acepto el <button type="button" class="lnk" style="margin:0;font-size:14.5px" data-act="showPriv">aviso de privacidad</button>. Es necesario para crear una cuenta.</span></label></div>
+    <div class="acts" style="margin-top:12px"><button class="btn" data-act="login">Entrar</button><button class="btn ghost" data-act="signup">Crear cuenta</button><button class="btn ghost" data-act="resetPass">Olvidé mi contraseña</button></div>
+    <p class="hint" id="lgMsg" role="status"></p>
+    <p class="lgfoot">Al usar Cuarteo se aplica el <button type="button" class="lnk" style="margin:0;font-size:13.5px" data-act="showPriv">aviso de privacidad</button>.</p></div>`;
 }
 async function afterLogin(){
   Store.mode = 'supa'; S.save = 'ok';
   try { await Store.loadSupa(); } catch (e) { toast('No se pudieron cargar los datos: ' + ((e && e.message) || e)); }
   if (S.migrated) { S.migrated = false; scheduleCfg(); }
-  render(); checkLink();
+  render(); checkConsent() || checkLink();
+}
+function checkConsent(){
+  if (Store.mode !== 'supa' || !Store.user) return false;
+  const md = Store.user.user_metadata || {}; if (md.aviso_privacidad === PRIV_VERSION) return false;
+  askConsent(); return true;
 }
 function askNewPassword(){
   openModal('Nueva contraseña', `<div class="grid"><div class="fld full"><label for="npPass">Escribe tu nueva contraseña</label><div class="inp"><input id="npPass" type="password" autocomplete="new-password"></div><p class="hint">Mínimo 8 caracteres.</p></div></div>`, `<button class="btn" data-act="savePass">Guardar contraseña</button>`);
@@ -1889,7 +1940,7 @@ function viewAjustes(){
   const t = lsGet('cuarteo.theme') || '';
   return `<header class="phead"><div><h1 class="disp">Ajustes</h1><p class="lede">Unidades, báscula, límites de alerta, etiquetas QR, integración con otros sistemas y respaldos.</p></div></header>
   <div class="blk"><h3>Dónde se guardan los datos</h3>${IN_CLAUDE ? `<p class="note">${esc(storeLabel())}. Esta es la versión de Cuarteo dentro de Claude.</p>`
-    : Store.mode === 'supa' ? `<p class="note">Guardado en la nube, en tu proyecto de Supabase (${esc((sbConf() || {u:''}).u.replace(/^https?:\/\//, ''))}). Sesión iniciada como <b>${esc(Store.user?.email || '')}</b>.</p><div class="acts"><button class="btn ghost" data-act="logout">Cerrar sesión</button>${sbConf() && !sbConf().embedded ? '<button class="btn ghost danger" data-act="sbDisconnect">Desconectar este navegador</button>' : ''}</div>`
+    : Store.mode === 'supa' ? `<p class="note">Guardado en la nube, en tu proyecto de Supabase (${esc((sbConf() || {u:''}).u.replace(/^https?:\/\//, ''))}). Sesión iniciada como <b>${esc(Store.user?.email || '')}</b>.</p><div class="acts"><button class="btn ghost" data-act="logout">Cerrar sesión</button><button class="btn ghost" data-act="showPriv">Aviso de privacidad</button><button class="btn ghost danger" data-act="delAccount">Eliminar mi cuenta</button>${sbConf() && !sbConf().embedded ? '<button class="btn ghost danger" data-act="sbDisconnect">Desconectar este navegador</button>' : ''}</div>`
     : `<p class="note">${esc(storeLabel())}. Conéctalo a Supabase para ver tus estudios desde cualquier equipo.</p><button class="btn ghost" data-act="sbConnect">Conectar con Supabase</button>`}</div>
   <div class="blk"><h3>Unidades de medida</h3><p class="note">Los datos se guardan en el sistema métrico y se convierten al mostrarlos y al generar los informes y la hoja de cálculo. El paquete JSON para ERP siempre se exporta en unidades del SI.</p>
     <div class="segs"><button class="seg${SYS() === 'MKS' ? ' on' : ''}" data-act="setUnits" data-v="MKS">Sistema métrico (MKS)</button><button class="seg${SYS() === 'ING' ? ' on' : ''}" data-act="setUnits" data-v="ING">Sistema inglés</button></div>
@@ -2297,13 +2348,25 @@ const ACT = {
     Store.user = data.user; await afterLogin(); },
   signup:async () => { const e = ($('#lgEmail')?.value || '').trim(), pw = $('#lgPass')?.value || ''; if (!e || !pw) { lgMsg('Escribe un correo y una contraseña.'); return; }
     if (pw.length < 8) { lgMsg('La contraseña debe tener al menos 8 caracteres.'); return; }
-    lgMsg('Creando la cuenta…'); const {data, error} = await Store.sb.auth.signUp({email:e, password:pw, options:{emailRedirectTo:location.origin + location.pathname}});
+    if (!$('#lgAcepto')?.checked) { lgMsg('Para crear la cuenta debes leer y aceptar el aviso de privacidad.'); return; }
+    lgMsg('Creando la cuenta…'); const {data, error} = await Store.sb.auth.signUp({email:e, password:pw, options:{emailRedirectTo:location.origin + location.pathname, data:{acepta_privacidad:true, aviso_privacidad:PRIV_VERSION, aceptado_en:new Date().toISOString()}}});
     if (error) { lgMsg('No se pudo crear la cuenta: ' + error.message); return; }
     if (data && data.session) { Store.user = data.user; await afterLogin(); } else lgMsg('Cuenta creada. Revisa tu correo y confirma la cuenta; luego entra con tu contraseña.'); },
   resetPass:async () => { const e = ($('#lgEmail')?.value || '').trim(); if (!e) { lgMsg('Escribe tu correo arriba y vuelve a tocar el botón.'); return; }
     const {error} = await Store.sb.auth.resetPasswordForEmail(e, {redirectTo:location.origin + location.pathname}); lgMsg(error ? 'No se pudo enviar el correo: ' + error.message : 'Te enviamos un correo para restablecer la contraseña.'); },
   savePass:async () => { const pw = $('#npPass')?.value || ''; if (pw.length < 8) { toast('La contraseña debe tener al menos 8 caracteres.'); return; }
     const {error} = await Store.sb.auth.updateUser({password:pw}); if (error) { toast('No se pudo cambiar: ' + error.message); return; } closeModal(); toast('Contraseña actualizada.'); },
+  showPriv:() => { if (S.consentPending) return; openModal('Aviso de privacidad', privacyHTML(), '<button class="btn" data-act="closeModal">Cerrar</button>', 'wide'); },
+  consentYes:async el => { el.disabled = true; const {data, error} = await Store.sb.auth.updateUser({data:{acepta_privacidad:true, aviso_privacidad:PRIV_VERSION, aceptado_en:new Date().toISOString()}});
+    if (error) { el.disabled = false; toast('No se pudo registrar tu aceptación: ' + error.message); return; }
+    if (data && data.user) Store.user = data.user; S.consentPending = false; closeModal(); toast('Gracias. Aceptaste el aviso de privacidad.'); checkLink(); },
+  consentNo:() => { S.consentPending = false; closeModal(); ACT.logout(); toast('Sin aceptar el aviso de privacidad no puedes usar la cuenta. Si quieres eliminarla, escribe al administrador.'); },
+  delAccount:() => openModal('Eliminar mi cuenta', `<p>Se eliminarán de forma permanente tu cuenta, tus ${S.campanas.length} ${S.campanas.length === 1 ? 'estudio' : 'estudios'}, tus ajustes y todas tus fotos. Esta acción no se puede deshacer.</p><p class="note">Si quieres conservar una copia, descarga antes un respaldo con fotos.</p><div class="grid"><div class="fld full"><label for="delConf">Escribe ELIMINAR para confirmar</label><div class="inp"><input id="delConf" autocomplete="off"></div></div></div>`,
+    `<button class="btn ghost" data-act="backup">${I.dl} Descargar respaldo</button><span class="sp"></span><button class="btn ghost" data-act="closeModal">Cancelar</button><button class="btn" style="background:var(--red);border-color:var(--red)" data-act="delAccountGo">Eliminar definitivamente</button>`),
+  delAccountGo:async el => { if (($('#delConf')?.value || '').trim().toUpperCase() !== 'ELIMINAR') { toast('Escribe ELIMINAR para confirmar.'); return; }
+    el.disabled = true; el.textContent = 'Eliminando…';
+    try { await Store.deleteAccount(); } catch (e) { el.disabled = false; el.textContent = 'Eliminar definitivamente'; toast(e.message || 'No se pudo eliminar la cuenta.'); return; }
+    closeModal(); S.campanas = []; Store.user = null; Store.mode = 'login'; S.ui.view = 'panel'; S.ui.campId = null; render(); toast('Tu cuenta y todos tus datos fueron eliminados.'); },
   logout:async () => { try { await Store.sb.auth.signOut(); } catch (e) {} Store.user = null; Store.mode = 'login'; S.campanas = []; S.ui.view = 'panel'; S.ui.campId = null; render(); },
   setQrModo:el => { S.cfg.qrModo = el.dataset.v; scheduleCfg(); renderMain(); toast('Modo de etiqueta actualizado. Vuelve a descargar las etiquetas.'); },
   setBaseDef:el => { lsSet('cuarteo.base', el.dataset.v); renderMain(); toast('Mapa base predeterminado: ' + (BASES.find(b => b[0] === el.dataset.v) || [, ''])[1].toLowerCase() + '.'); },
@@ -2455,7 +2518,8 @@ document.addEventListener('input', e => {
   if (el.dataset && el.dataset.ui) { S.ui[el.dataset.ui] = el.value; renderMain(); return; }
   if (el.dataset && el.dataset.bind && el.tagName !== 'BUTTON') applyBind(el);
 });
-$('#modal').addEventListener('close', () => { S.pick = null; if (GEOMAP) { GEOMAP.remove(); GEOMAP = null; } S.geo = null; if (S.ui.view === 'camp' && S.ui.stage === 3) live(); });
+$('#modal').addEventListener('close', () => { if (S.consentPending) { S.consentPending = false; setTimeout(() => ACT.logout(), 0); }
+  S.pick = null; if (GEOMAP) { GEOMAP.remove(); GEOMAP = null; } S.geo = null; if (S.ui.view === 'camp' && S.ui.stage === 3) live(); });
 let rzT = null; window.addEventListener('resize', () => { clearTimeout(rzT); rzT = setTimeout(() => { const d = document.querySelector('details.guide'); if (d) d.open = window.matchMedia('(min-width:1101px)').matches || d.open; }, 200); });
 if (window.matchMedia) window.matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', () => { if (S.ready) renderMain(); });
 
@@ -2465,7 +2529,7 @@ if (window.matchMedia) window.matchMedia('(prefers-color-scheme: dark)').addEven
   renderShell(); renderMain();
   Store.init().catch(e => console.warn(e)).finally(() => {
     S.ready = true; render(); if (S.migrated && Store.mode !== 'login' && Store.mode !== 'setup') { S.migrated = false; scheduleCfg(); }
-    checkLink(); window.addEventListener('hashchange', () => { if (Store.mode === 'login') renderMain(); else checkLink(); });
+    checkConsent() || checkLink(); window.addEventListener('hashchange', () => { if (Store.mode === 'login') renderMain(); else checkLink(); });
     setTimeout(() => tilesOK(), 800);
     setTimeout(() => loadLib('qr').catch(() => {}), 1500);
     cap('sample').then(s => { S.ai = !!s; if (S.ai && S.ui.view === 'camp' && S.ui.stage === 6) renderMain(); });
