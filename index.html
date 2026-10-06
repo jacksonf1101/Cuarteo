@@ -392,6 +392,24 @@ dialog.wide{width:min(920px,96vw)}
 .g-plbl span{position:absolute;transform:translate(-50%,-50%);font:700 11px/1.1 var(--f-b);color:var(--ink-3);white-space:nowrap;pointer-events:none}
 .g-city span{position:absolute;left:-4px;top:-8px;display:flex;align-items:center;gap:5px;white-space:nowrap;font:700 11.5px/16px var(--f-b);color:var(--ink);text-shadow:0 0 3px var(--surface),0 0 3px var(--surface);pointer-events:none}
 .g-city span::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--ink);box-shadow:0 0 0 1.5px var(--surface);flex:none}
+/* ---------- V 1.8: componentes del estudio y diagnóstico ---------- */
+.cpick{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.cpk{display:inline-flex;align-items:center;gap:7px;padding:7px 12px;border-radius:999px;border:1.5px solid var(--line-2);background:var(--surface);font-weight:700;font-size:14px;color:var(--ink-2);cursor:pointer}
+.cpk i{width:12px;height:12px;border-radius:50%;flex:none;opacity:.35}
+.cpk.on{border-color:var(--leaf);background:var(--leaf-soft);color:var(--ink)}
+.cpk.on i{opacity:1}
+.cpk.lock{cursor:default}
+.cpk small{font-weight:400;color:var(--ink-3);font-size:12px}
+details.csel{margin:16px 0 4px;border:1.5px solid var(--line);border-radius:var(--r2);background:var(--surface);padding:12px 14px}
+details.csel summary{display:flex;align-items:center;gap:10px;cursor:pointer;list-style:none;font-weight:700}
+details.csel summary::-webkit-details-marker{display:none}
+details.csel summary .ic{transition:transform .2s;color:var(--ink-3)}
+details.csel[open] summary .ic{transform:rotate(90deg)}
+.diag{margin:18px 0 0;padding:14px 16px;border-radius:var(--r2);border:1.5px solid var(--line-2);background:var(--surface)}
+.diag.bad{border-color:color-mix(in srgb,var(--red) 55%,transparent);background:var(--red-soft)}
+.diag.ok{border-color:var(--leaf);background:var(--leaf-soft)}
+.diag b{display:block;margin-bottom:4px}
+.diag pre{white-space:pre-wrap;word-break:break-all;margin:10px 0 0;font:12.5px/1.5 ui-monospace,Menlo,Consolas,monospace;background:var(--sunk);padding:10px;border-radius:var(--r1);color:var(--ink-2)}
 /* ---------- V 1.7: privacidad ---------- */
 .priv h4{margin:16px 0 4px;font-size:15px}
 .priv p,.priv li{font-size:14.5px;color:var(--ink-2);margin:4px 0}
@@ -651,8 +669,9 @@ const CATCOL = {
 const unidad = c => UNIDADES.find(u => u[0] === c.unidadBase) || UNIDADES[0];
 const unidadCorta = c => unidad(c)[1];
 const unidadPlural = c => unidad(c)[2];
-const APP_VERSION = 'V 1.7';
+const APP_VERSION = 'V 1.8';
 const CHANGELOG = [
+  ['V 1.8', 'En Clasificación se eligen los componentes de cada estudio (por ejemplo solo cartón, vidrio y plástico) y solo esos aparecen al pesar; los que ya tienen pesos no se pueden quitar. La pantalla de conexión con Supabase muestra un diagnóstico de config.js con la causa exacta del problema.'],
   ['V 1.7', 'Aviso de privacidad con aceptación obligatoria al crear la cuenta (y una sola vez para las cuentas existentes); opción Eliminar mi cuenta, que borra de forma permanente la cuenta, los estudios, los ajustes y las fotos.'],
   ['V 1.6', 'Versión para publicar en GitHub con Supabase: inicio de sesión, estudios, ajustes y fotos en la nube. Fuera de Claude, el QR abre la app en el navegador con la ficha del contenedor y, con sesión iniciada, sus muestras. Respaldo con fotos para migrar datos entre espacios.'],
   ['V 1.5', 'Las etiquetas QR llevan todos los datos de la fuente (código, nombre, tipo, estrato o área, población o unidad base, turno, municipio, coordenadas, estudio y entidad) y se pueden generar como ficha web o como texto que no necesita internet; vista previa de lo que verá quien escanee; etiquetas con QR más grande.'],
@@ -701,6 +720,8 @@ function isExpanded(c, m, kid){
   if (childrenOf(kid).some(x => num(m.comp?.[x.id]?.peso) > 0)) return true;
   return m.det?.[kid] ?? c.detDefault?.[kid] ?? false;
 }
+function usedComps(c){ const s2 = new Set(); c.muestras.forEach(m => Object.entries(m.comp || {}).forEach(([k, v]) => { if (num(v.peso) > 0) s2.add(rootId(k)); })); return s2; }
+function selTops(c){ const tops = topComps(); if (!Array.isArray(c.compSel)) return tops; const used = usedComps(c); return tops.filter(k => c.compSel.includes(k.id) || used.has(k.id)); }
 const codeByRef = ref => ref ? S.catalogo.codigos.find(x => x.id === ref) : null;
 const codeLabel = x => x ? `${x.sis} ${x.cod}` : 'Sin código';
 const findM = (c, id) => c && c.muestras.find(m => m.id === id);
@@ -855,7 +876,7 @@ const GUIDE = [
    checks:c => { const ms = c.muestras, h = ms.length > 0; return [[h,'Al menos una muestra'],[h && ms.every(m => num(m.pesoGenerado) > 0),'Peso generado en cada muestra'],[h && ms.every(m => num(m.cuarteo?.final) > 0),'Peso final del cuarteo'],
      ...(modOn(c, 'dens') ? [[h && ms.some(m => densOf(m).ds != null),'Densidad registrada']] : []), ...(modOn(c, 'hum') ? [[h && ms.some(m => humOf(m) != null),'Humedad registrada']] : []), ...(modOn(c, 'ubi') ? [[h && ms.some(m => (m.fotos || []).length > 0),'Evidencia fotográfica']] : [])]; }},
   {que:'Separa la muestra final por componentes y pesa cada uno. La franja de color muestra la composición mientras pesas.',
-   pasos:['Elige la muestra o escanea el QR de su contenedor.','Pesa cada fracción. El plástico se registra en general; toca Detallar por tipo solo cuando necesites separar PET, PEAD, PP y los demás.','Con báscula conectada, toca la flecha del componente para registrar la lectura.','Revisa el cierre de balance: la suma de componentes debe acercarse al peso de la muestra.','Toca el código de un componente si ese registro no sigue la clasificación por defecto.'],
+   pasos:['Elige en "Componentes de este estudio" los tipos de residuo que vas a clasificar, por ejemplo cartón, vidrio y plástico.','Elige la muestra o escanea el QR de su contenedor.','Pesa cada fracción. El plástico se registra en general; toca Detallar por tipo solo cuando necesites separar PET, PEAD, PP y los demás.','Con báscula conectada, toca la flecha del componente para registrar la lectura.','Revisa el cierre de balance: la suma de componentes debe acercarse al peso de la muestra.','Toca el código de un componente si ese registro no sigue la clasificación por defecto.'],
    checks:c => { const ms = c.muestras, h = ms.length > 0; return [[h && ms.some(m => sampleCompTotal(m) > 0),'Al menos una muestra clasificada'],[h && ms.every(m => sampleCompTotal(m) > 0),'Todas las muestras clasificadas'],[h && ms.some(m => sampleCompTotal(m) > 0) && ms.every(m => { const t = sampleCompTotal(m), f = num(m.cuarteo?.final); return !(t > 0 && f > 0) || Math.abs(t - f) / f * 100 <= S.cfg.tolBalance; }),'Cierres de balance dentro de tolerancia']]; }},
   {que:'Registra los análisis de laboratorio cuando el estudio los requiera: valorización energética, peligrosidad o disposición especial.',
    pasos:['Indica laboratorio, fecha y la muestra analizada.','Copia PCI, humedad, cenizas y los demás parámetros del certificado.','Para residuos industriales o sospechosos, registra pH, punto de inflamación y metales por TCLP. La app los compara con los límites de Ajustes.'],
@@ -973,6 +994,7 @@ const photoIds = c => c.muestras.flatMap(m => (m.fotos || []).map(p => p.id));
 const IN_CLAUDE = !!(window.claude && typeof window.claude.use === 'function') || /(^|\.)(claude\.ai|claudeusercontent\.com|anthropic\.com)$/i.test(location.hostname || '');
 const BOOT_HASH = (() => { try { return location.hash || ''; } catch (e) { return ''; } })();
 function fileConf(){ const c = window.CUARTEO_CONFIG || {}; const u = String(c.supabaseUrl || '').trim(), k = String(c.supabaseAnonKey || '').trim();
+  if (/service_role|sb_secret_/i.test(k) || jwtRole(k) === 'service_role') return null;
   return u && k && !/TU-PROYECTO|PEGA-AQUI/i.test(u + k) ? {u, k} : null; }
 function sbConf(){
   const fc = fileConf();
@@ -993,7 +1015,10 @@ const Store = {
       if (db) { const u = await cap('user'); if (u) { try { id = await u.id(); } catch (e) { id = null; } } }
       if (db && id) { this.db = db; this.uid = id; this.mode = 'db'; try { await this.load(); return; } catch (e) { console.warn('db', e); } }
     } else if (lsGet('cuarteo.sb.off') !== '1') {
-      if (!window.CUARTEO_CONFIG && /^https?:$/.test(location.protocol)) await loadSrc('config.js?v=' + Date.now());
+      if (!window.CUARTEO_CONFIG && /^https?:$/.test(location.protocol)) {
+        let cfgErr = null; const onErr = ev => { if (String(ev.filename || '').includes('config.js')) cfgErr = `${ev.message}${ev.lineno ? ' (línea ' + ev.lineno + ')' : ''}`; };
+        window.addEventListener('error', onErr); this.cfgLoaded = await loadSrc('config.js?v=' + Date.now()); window.removeEventListener('error', onErr); this.cfgError = cfgErr;
+      }
       if (!sbConf()) { this.mode = 'setup'; return; }
       try { await this.sbStart(); return; } catch (e) { console.warn('supabase', e); this.sbError = (e && e.message) || String(e); this.mode = 'setup'; return; }
     }
@@ -1596,7 +1621,7 @@ function renderMain(){
   if (!S.ready) { main.innerHTML = `<div class="loading">${logo(48)}<p>Abriendo tu espacio de trabajo…</p></div>`; return; }
   const v = S.ui.view;
   if (v === 'camp' && !cur()) S.ui.view = 'panel';
-  if (Store.mode === 'setup' || Store.mode === 'login') { main.innerHTML = Store.mode === 'setup' ? viewSetup() : viewLogin(); return; }
+  if (Store.mode === 'setup' || Store.mode === 'login') { main.innerHTML = Store.mode === 'setup' ? viewSetup() : viewLogin(); if (Store.mode === 'setup') fillDiag(); return; }
   main.innerHTML = S.ui.view === 'panel' ? viewPanel() : S.ui.view === 'camp' ? viewCamp() : S.ui.view === 'catalogo' ? viewCatalogo() : viewAjustes();
   live(); hydratePhotos(); requestAnimationFrame(() => { drawCharts(); drawMaps(); });
   const on = main.querySelector('.stg.on'); if (on && on.parentElement) { const nv = on.parentElement; nv.scrollLeft = Math.max(0, on.offsetLeft - nv.clientWidth / 2 + on.offsetWidth / 2); }
@@ -1642,10 +1667,31 @@ const brandHTML = () => `<div class="lgbrand">${logo(52)}<div><h1 class="disp" s
 function viewSetup(){
   return `<div class="login">${brandHTML()}<p class="lede">Conecta Cuarteo con tu proyecto de Supabase para guardar los estudios en la nube. Los datos están en Supabase, en Project Settings, API.</p>
     ${Store.sbError ? `<p class="note" style="color:var(--red)">No se pudo conectar: ${esc(Store.sbError)}</p>` : ''}
+    <div class="diag" id="cfgDiag"><b>Revisando config.js…</b></div>
     <div class="lgform"><div class="fld"><label for="sbUrl">Project URL</label><div class="inp"><input id="sbUrl" placeholder="https://abcdefgh.supabase.co" value="${esc(lsGet('cuarteo.sb.url') || '')}" autocomplete="off"></div></div>
     <div class="fld"><label for="sbKey">Clave anon public o publishable</label><div class="inp"><input id="sbKey" placeholder="eyJhbGciOi… o sb_publishable_…" value="${esc(lsGet('cuarteo.sb.key') || '')}" autocomplete="off"></div><p class="hint">Nunca pegues la clave service_role ni la secret: esa da acceso total a tu base de datos.</p></div></div>
     <div class="acts" style="margin-top:16px"><button class="btn" data-act="sbSave">Conectar</button><button class="btn ghost" data-act="sbOffline">Usar sin conexión en este navegador</button></div>
     <p class="hint" style="margin-top:14px">Para que todos los equipos se conecten sin escribir esto, pega los dos datos en el archivo config.js de tu repositorio de GitHub.</p></div>`;
+}
+const maskKey = t => String(t).replace(/(['"])([A-Za-z0-9_\-.]{24,})\1/g, (m, q, v) => `${q}${v.slice(0, 12)}…${v.slice(-4)}${q}`);
+async function diagConfig(){
+  if (!/^https?:$/.test(location.protocol)) return {bad:true, title:'Estás abriendo el archivo desde tu computadora', msg:'Así no se puede leer config.js. Abre la dirección de GitHub Pages (https://TU-USUARIO.github.io/TU-REPOSITORIO/).'};
+  const url = new URL('config.js', location.href).href; let r, txt = '';
+  try { r = await fetch(url + '?v=' + Date.now(), {cache:'no-store'}); txt = r.ok ? await r.text() : ''; } catch (e) { return {bad:true, title:'No se pudo descargar config.js', msg:'Revisa tu conexión a internet y recarga la página.', url}; }
+  if (!r.ok) return {bad:true, title:`No se encontró config.js (error ${r.status})`, msg:'La app lo busca en la misma carpeta que index.html. Revisa que el archivo se llame exactamente config.js, en minúsculas y sin .txt al final, y que esté junto a index.html en el repositorio. Si acabas de subirlo, espera uno o dos minutos y recarga con Ctrl + F5.', url};
+  if (Store.cfgError || !window.CUARTEO_CONFIG) return {bad:true, title:'config.js tiene un error de escritura', msg:`${Store.cfgError ? 'El navegador dice: ' + Store.cfgError + '. ' : ''}Revisa que cada valor esté entre comillas simples, que haya una coma entre los datos y que todas las llaves { } cierren. Debe empezar con window.CUARTEO_CONFIG = {`, url, txt};
+  const c = window.CUARTEO_CONFIG; const u = String(c.supabaseUrl || ''), k = String(c.supabaseAnonKey || '');
+  if (!u || !k) return {bad:true, title:'Faltan datos en config.js', msg:`No encontré ${!u ? 'supabaseUrl' : 'supabaseAnonKey'}. Los nombres deben escribirse exactamente así: supabaseUrl y supabaseAnonKey.`, url, txt};
+  if (/TU-PROYECTO|PEGA-AQUI/i.test(u + k)) return {bad:true, title:'config.js todavía tiene los valores de ejemplo', msg:'Cambia TU-PROYECTO y PEGA-AQUI-LA-CLAVE-ANON-PUBLIC por tu Project URL y tu clave anon public de Supabase. Edita el archivo en GitHub con el ícono del lápiz y guarda con Commit changes.', url, txt};
+  if (/service_role|sb_secret_/i.test(k) || jwtRole(k) === 'service_role') return {bad:true, title:'Pegaste la clave secreta', msg:'Esa clave da acceso total a tu base de datos y no debe estar en GitHub. Cámbiala por la clave anon public o publishable y, por seguridad, genera una nueva clave secreta en Supabase.', url};
+  if (!/^https:\/\/[^\s/]+\.supabase\.co\/?$/i.test(u)) return {bad:false, title:'Revisa la Project URL', msg:`La dirección "${u}" no tiene la forma habitual https://xxxx.supabase.co. Si es correcta, ignora este aviso.`, url, txt};
+  if (Store.sbError) return {bad:true, title:'config.js está bien, pero Supabase no respondió', msg:`Error: ${Store.sbError}. Revisa que la Project URL y la clave anon public sean del mismo proyecto.`, url};
+  return {bad:false, ok:true, title:'config.js está bien', msg:'Recarga la página con Ctrl + F5. Si vuelves a ver esta pantalla, avísame.', url};
+}
+async function fillDiag(){
+  const el = $('#cfgDiag'); if (!el) return; const d = await diagConfig(); if (!$('#cfgDiag')) return;
+  el.className = 'diag' + (d.bad ? ' bad' : d.ok ? ' ok' : '');
+  el.innerHTML = `<b>${esc(d.title)}</b><span>${esc(d.msg)}</span>${d.url ? `<p class="hint" style="margin:8px 0 0">Archivo revisado: ${esc(d.url)}</p>` : ''}${d.txt ? `<pre>${esc(maskKey(d.txt).slice(0, 1500))}</pre>` : ''}`;
 }
 function viewLogin(){
   const d = hashFicha();
@@ -1810,7 +1856,7 @@ function stClasif(c){
       <div class="cp" data-calc="pct:${m.id}:${k.id}"></div>
       <button class="cc" data-act="detalle" data-m="${m.id}" data-k="${k.id}" data-calc="code:${m.id}:${k.id}" title="Código y clasificación de este registro"></button>
       ${modOn(c, 'ubi') ? `<button class="ib" data-act="photoComp" data-m="${m.id}" data-k="${k.id}" title="Foto de este componente" aria-label="Foto de este componente">${I.cam}${nf ? `<span class="badge">${nf}</span>` : ''}</button>` : ''}</div>`; };
-  const rows = topComps().map(k => { const kids = childrenOf(k.id); if (!kids.length) return row(k);
+  const rows = selTops(c).map(k => { const kids = childrenOf(k.id); if (!kids.length) return row(k);
     const exp = isExpanded(c, m, k.id); const nm = esc(k.nombre.toLowerCase());
     const tg = `<button class="lnk${exp ? ' open' : ''}" data-act="toggleGroup" data-m="${m.id}" data-k="${k.id}" aria-expanded="${exp}">${I.chevR}${exp ? `Volver a ${nm} general` : `Detallar por tipo (${kids.length} tipos)`}</button>`;
     if (!exp) return row(k, {extra:tg});
@@ -1821,8 +1867,19 @@ function stClasif(c){
       ${fNum('Peso de la muestra (cuarteo)', B + '.cuarteo.final', m.cuarteo?.final, {q:'m', scale:true})}</div>
     <div data-calc="strip:${m.id}">${stripHTML(weightsOf(m))}</div>
     <div class="bal" data-calc="bal:${m.id}"></div>
-    <div class="crows">${rows}</div>
-    <p class="hint" style="margin-top:12px">¿Falta un componente? Agrégalo en el <button class="seg" style="padding:0;text-decoration:underline" data-act="nav" data-v="catalogo">catálogo normativo</button> y aparecerá aquí.</p>`;
+    ${compPicker(c)}
+    <div class="crows">${rows || '<p class="note" style="padding:14px 0">Este estudio no tiene componentes elegidos. Abre "Componentes de este estudio" y elige los que vas a clasificar.</p>'}</div>
+    <p class="hint" style="margin-top:12px">¿Falta un componente? Agrégalo en el <button class="seg" style="padding:0;text-decoration:underline" data-act="nav" data-v="catalogo">catálogo normativo</button> y luego actívalo en "Componentes de este estudio".</p>`;
+}
+
+function compPicker(c){
+  const tops = topComps(); const sel = selTops(c); const used = usedComps(c); const on = new Set(sel.map(k => k.id));
+  const chips = tops.map(k => { const lock = used.has(k.id); const kids = childrenOf(k.id).length;
+    return `<button type="button" class="cpk${on.has(k.id) ? ' on' : ''}${lock ? ' lock' : ''}" data-act="toggleComp" data-k="${k.id}" aria-pressed="${on.has(k.id)}" title="${lock ? 'Tiene pesos registrados en este estudio' : on.has(k.id) ? 'Quitar de este estudio' : 'Agregar a este estudio'}"><i style="background:${k.color}"></i>${esc(k.nombre)}${kids ? ` <small>${kids} tipos</small>` : ''}${lock ? ' <small>con pesos</small>' : ''}</button>`; }).join('');
+  return `<details class="csel"${S.ui.compPick ? ' open' : ''} data-act="compPickToggle"><summary>${I.chevR}<span>Componentes de este estudio</span><span class="mute" style="font-weight:400">${sel.length} de ${tops.length}</span></summary>
+    <p class="hint" style="margin:10px 0 0">Toca un componente para agregarlo o quitarlo. Solo los activos aparecen para pesar. Los que ya tienen pesos en este estudio no se pueden quitar.</p>
+    <div class="cpick">${chips}</div>
+    <div class="acts" style="margin-top:12px"><button type="button" class="btn ghost sm" data-act="compsAll">Todos</button><button type="button" class="btn ghost sm" data-act="compsNone">Solo los que tienen pesos</button></div></details>`;
 }
 
 function stLab(c){
@@ -2378,6 +2435,13 @@ const ACT = {
   contOpen:() => { const k = S.cont; if (!k) return; closeModal(); openCamp(k.campId, 2); },
   contClasif:() => { const k = S.cont; if (!k) return; const c = S.campanas.find(x => x.id === k.campId); const ms = c.muestras.filter(m => m.fuenteId === k.fuenteId); const m = ms.find(x => sampleCompTotal(x) === 0) || ms[ms.length - 1]; closeModal(); openCamp(k.campId, 3, {clasif:m?.id}); },
   contNew:() => { const k = S.cont; if (!k) return; const c = S.campanas.find(x => x.id === k.campId); const m = newSample(c, k.fuenteId); m.fecha = today(); c.muestras.push(m); scheduleSave(c); closeModal(); openCamp(k.campId, 2, {open:m.id}); toast(`Muestra ${mLabel(c, m)} creada para ${c.fuentes.find(f => f.id === k.fuenteId)?.codigo || 'el contenedor'}, día ${m.dia}.`); },
+  compPickToggle:(el, e) => { if (e.target.closest('summary')) { e.preventDefault(); S.ui.compPick = !el.open; el.open = S.ui.compPick; } },
+  toggleComp:el => { const c = cur(); const k = el.dataset.k; if (usedComps(c).has(k)) { toast('No se puede quitar: este componente tiene pesos registrados en el estudio.'); return; }
+    const tops = topComps().map(x => x.id); let sel = Array.isArray(c.compSel) ? c.compSel.filter(x => tops.includes(x)) : tops.slice();
+    sel = sel.includes(k) ? sel.filter(x => x !== k) : [...sel, k];
+    c.compSel = tops.every(x => sel.includes(x)) ? null : sel; S.ui.compPick = true; scheduleSave(c); renderMain(); },
+  compsAll:() => { const c = cur(); c.compSel = null; S.ui.compPick = true; scheduleSave(c); renderMain(); },
+  compsNone:() => { const c = cur(); c.compSel = [...usedComps(c)]; S.ui.compPick = true; scheduleSave(c); renderMain(); toast('Quedan solo los componentes con pesos. Agrega los que vayas a usar.'); },
   toggleGroup:el => { const c = cur(); const m = findM(c, el.dataset.m); const kid = el.dataset.k; const k = compById(kid); const kids = childrenOf(kid);
     m.det = m.det || {}; c.detDefault = c.detDefault || {};
     if (!isExpanded(c, m, kid)) { m.det[kid] = true; c.detDefault[kid] = true; scheduleSave(c); renderMain(); return; }
@@ -2509,7 +2573,7 @@ async function aiDraft(){
 }
 
 /* ---------- eventos ---------- */
-document.addEventListener('click', e => { const a = e.target.closest('[data-act]'); if (!a || a.disabled) return; const fn = ACT[a.dataset.act]; if (fn) { e.preventDefault(); fn(a, e); } });
+document.addEventListener('click', e => { const a = e.target.closest('[data-act]'); if (!a || a.disabled) return; if (a.tagName === 'DETAILS' && !e.target.closest('summary')) return; const fn = ACT[a.dataset.act]; if (fn) { e.preventDefault(); fn(a, e); } });
 document.addEventListener('input', e => {
   const el = e.target;
   if (el.id === 'codeSearch') { $('#codeList').innerHTML = codeListHTML(); return; }
