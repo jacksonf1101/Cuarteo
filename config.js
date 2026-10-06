@@ -5,7 +5,7 @@
 //   NUNCA pegues aquí la clave "service_role" ni la "secret".
 window.CUARTEO_CONFIG = {
   supabaseUrl: 'https://kalzxqtnmijhgydhakou.supabase.co',
-  supabaseAnonKey: 'sb_publishable_ASmEUhq8iGxFZPCkcxvaZw_Vx_iHkHv'
+  supabaseAnonKey: 'sb_publishable_ASmEUhq8iGxFZPCkcxvaZw_Vx_iHkHv',
 privacidad: {
     responsable: 'JC Waste Management',
     contacto: 'pereyrajackson@gmail.com'
