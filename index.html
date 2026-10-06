@@ -392,6 +392,16 @@ dialog.wide{width:min(920px,96vw)}
 .g-plbl span{position:absolute;transform:translate(-50%,-50%);font:700 11px/1.1 var(--f-b);color:var(--ink-3);white-space:nowrap;pointer-events:none}
 .g-city span{position:absolute;left:-4px;top:-8px;display:flex;align-items:center;gap:5px;white-space:nowrap;font:700 11.5px/16px var(--f-b);color:var(--ink);text-shadow:0 0 3px var(--surface),0 0 3px var(--surface);pointer-events:none}
 .g-city span::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--ink);box-shadow:0 0 0 1.5px var(--surface);flex:none}
+/* ---------- V 1.9: inicio de sesión y registro ---------- */
+body.noauth .rail,body.noauth .tabbar,body.noauth .scalechip{display:none!important}
+body.noauth .app{grid-template-columns:minmax(0,1fr)}
+body.noauth main{max-width:680px;margin:0 auto;padding-bottom:40px}
+.lgcard{display:flex;align-items:center;gap:14px;width:100%;margin-top:22px;padding:16px 18px;border:1.5px solid var(--line-2);border-radius:var(--r2);background:var(--surface);text-align:left;cursor:pointer;color:var(--ink)}
+.lgcard:hover{border-color:var(--leaf);background:var(--leaf-soft)}
+.lgcard span{flex:1}
+.lgcard b{display:block;font-size:16px}
+.lgcard small{display:block;color:var(--ink-2);font-size:14px;margin-top:2px}
+.lgcard .ic{color:var(--leaf)}
 /* ---------- V 1.8: componentes del estudio y diagnóstico ---------- */
 .cpick{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
 .cpk{display:inline-flex;align-items:center;gap:7px;padding:7px 12px;border-radius:999px;border:1.5px solid var(--line-2);background:var(--surface);font-weight:700;font-size:14px;color:var(--ink-2);cursor:pointer}
@@ -669,8 +679,9 @@ const CATCOL = {
 const unidad = c => UNIDADES.find(u => u[0] === c.unidadBase) || UNIDADES[0];
 const unidadCorta = c => unidad(c)[1];
 const unidadPlural = c => unidad(c)[2];
-const APP_VERSION = 'V 1.8';
+const APP_VERSION = 'V 1.9';
 const CHANGELOG = [
+  ['V 1.9', 'La pantalla de inicio es solo para iniciar sesión; desde un recuadro se pasa a la pantalla de registro, que pide confirmar la contraseña y aceptar el aviso de privacidad.'],
   ['V 1.8', 'En Clasificación se eligen los componentes de cada estudio (por ejemplo solo cartón, vidrio y plástico) y solo esos aparecen al pesar; los que ya tienen pesos no se pueden quitar. La pantalla de conexión con Supabase muestra un diagnóstico de config.js con la causa exacta del problema.'],
   ['V 1.7', 'Aviso de privacidad con aceptación obligatoria al crear la cuenta (y una sola vez para las cuentas existentes); opción Eliminar mi cuenta, que borra de forma permanente la cuenta, los estudios, los ajustes y las fotos.'],
   ['V 1.6', 'Versión para publicar en GitHub con Supabase: inicio de sesión, estudios, ajustes y fotos en la nube. Fuera de Claude, el QR abre la app en el navegador con la ficha del contenedor y, con sesión iniciada, sus muestras. Respaldo con fotos para migrar datos entre espacios.'],
@@ -1606,11 +1617,12 @@ function mapImage(c, R, W = 1400, H = 760){
 function campMeta(c){ return [c.tipo, c.entidad, c.municipio, c.fechaInicio ? `desde ${fdate(c.fechaInicio)}` : ''].filter(Boolean).join(', '); }
 function render(){ renderShell(); renderMain(); }
 function renderShell(){
+  const noauth = S.ready && (Store.mode === 'login' || Store.mode === 'setup'); document.body.classList.toggle('noauth', noauth);
   const nav = [['panel', I.grid, 'Caracterizaciones'], ['catalogo', I.book, 'Catálogo normativo'], ['ajustes', I.sliders, 'Ajustes']];
   const v = S.ui.view === 'camp' ? 'panel' : S.ui.view;
   const items = cls => nav.map(([k, ic, t]) => `<button class="nv${v === k ? ' on' : ''}" data-act="nav" data-v="${k}"${v === k ? ' aria-current="page"' : ''}>${ic}<span>${cls ? t.split(' ')[0] : t}</span></button>`).join('');
   $('#rail').innerHTML = `<div class="brand">${logo(36)}<div><b>Cuarteo</b><small>Caracterización de residuos sólidos</small><span class="vtag">${APP_VERSION}</span></div></div><nav aria-label="Secciones">${items(false)}<button class="nv" data-act="scanGlobal">${I.scan}<span>Escanear contenedor</span></button></nav><div class="railfoot">${acctHTML()}<div class="stat" data-status></div><div class="stat" data-scale></div><div class="stat">${I.gauge}<span>Unidades: ${SYS() === 'ING' ? 'sistema inglés' : 'métrico (MKS)'}</span></div></div>`;
-  $('#mtop').innerHTML = `${logo(28)}<b>Cuarteo</b><span class="vtag" style="margin:0">${APP_VERSION}</span><div class="stat" data-status></div><button class="ib" data-act="scanGlobal" aria-label="Escanear contenedor" title="Escanear contenedor">${I.scan}</button>`;
+  $('#mtop').innerHTML = `${logo(28)}<b>Cuarteo</b><span class="vtag" style="margin:0">${APP_VERSION}</span>${noauth ? '' : '<div class="stat" data-status></div><button class="ib" data-act="scanGlobal" aria-label="Escanear contenedor" title="Escanear contenedor">' + I.scan + '</button>'}`;
   $('#tabbar').innerHTML = items(true) + `<button class="nv" data-act="scanGlobal">${I.scan}<span>Escanear</span></button>`;
   drawStatus(); drawScale();
 }
@@ -1694,18 +1706,28 @@ async function fillDiag(){
   el.innerHTML = `<b>${esc(d.title)}</b><span>${esc(d.msg)}</span>${d.url ? `<p class="hint" style="margin:8px 0 0">Archivo revisado: ${esc(d.url)}</p>` : ''}${d.txt ? `<pre>${esc(maskKey(d.txt).slice(0, 1500))}</pre>` : ''}`;
 }
 function viewLogin(){
+  if (S.ui.auth === 'signup') return viewSignup();
   const d = hashFicha();
   const ficha = d ? `<div class="sitem" style="padding:16px;margin-bottom:8px;max-width:640px">${fichaPreviewHTML(d)}${d.la != null && d.lo != null ? `<div class="acts" style="margin-top:14px"><a class="btn" href="https://www.google.com/maps/dir/?api=1&destination=${d.la},${d.lo}" target="_blank" rel="noopener">Cómo llegar</a><a class="btn ghost" href="https://www.google.com/maps/search/?api=1&query=${d.la},${d.lo}" target="_blank" rel="noopener">Ver en Google Maps</a></div>` : ''}<p class="hint" style="margin-top:12px">Inicia sesión para ver las muestras de este contenedor y registrar nuevas.</p></div>` : '';
   return `${ficha}<div class="login">${d ? '' : brandHTML()}<p class="lede">${d ? 'Iniciar sesión en Cuarteo' : 'Inicia sesión para ver tus estudios.'}</p>
-    <div class="lgform"><div class="fld"><label for="lgEmail">Correo</label><div class="inp"><input id="lgEmail" type="email" autocomplete="username" inputmode="email"></div></div>
-    <div class="fld"><label for="lgPass">Contraseña</label><div class="inp"><input id="lgPass" type="password" autocomplete="current-password"></div></div>
-    <label class="chkl" style="font-weight:400;font-size:14.5px"><input type="checkbox" id="lgAcepto"><span>He leído y acepto el <button type="button" class="lnk" style="margin:0;font-size:14.5px" data-act="showPriv">aviso de privacidad</button>. Es necesario para crear una cuenta.</span></label></div>
-    <div class="acts" style="margin-top:12px"><button class="btn" data-act="login">Entrar</button><button class="btn ghost" data-act="signup">Crear cuenta</button><button class="btn ghost" data-act="resetPass">Olvidé mi contraseña</button></div>
+    <div class="lgform"><div class="fld"><label for="lgEmail">Correo</label><div class="inp"><input id="lgEmail" type="email" autocomplete="username" inputmode="email" value="${esc(S.ui.authEmail || '')}"></div></div>
+    <div class="fld"><label for="lgPass">Contraseña</label><div class="inp"><input id="lgPass" type="password" autocomplete="current-password"></div></div></div>
+    <div class="acts" style="margin-top:16px"><button class="btn" data-act="login">Entrar</button><button class="btn ghost" data-act="resetPass">Olvidé mi contraseña</button></div>
+    <p class="hint" id="lgMsg" role="status">${esc(S.ui.authMsg || '')}</p>
+    <button type="button" class="lgcard" data-act="showSignup"><span><b>¿No tienes cuenta?</b><small>Regístrate para empezar a usar Cuarteo.</small></span>${I.chevR}</button></div>`;
+}
+function viewSignup(){
+  return `<div class="login">${brandHTML()}<p class="lede">Crear una cuenta</p>
+    <div class="lgform"><div class="fld"><label for="suEmail">Correo</label><div class="inp"><input id="suEmail" type="email" autocomplete="email" inputmode="email"></div></div>
+    <div class="fld"><label for="suPass">Contraseña</label><div class="inp"><input id="suPass" type="password" autocomplete="new-password"></div><p class="hint">Mínimo 8 caracteres.</p></div>
+    <div class="fld"><label for="suPass2">Repite la contraseña</label><div class="inp"><input id="suPass2" type="password" autocomplete="new-password"></div></div>
+    <label class="chkl" style="font-weight:400;font-size:14.5px"><input type="checkbox" id="suAcepto"><span>He leído y acepto el <button type="button" class="lnk" style="margin:0;font-size:14.5px" data-act="showPriv">aviso de privacidad</button>.</span></label></div>
+    <div class="acts" style="margin-top:12px"><button class="btn" data-act="signup">Crear cuenta</button></div>
     <p class="hint" id="lgMsg" role="status"></p>
-    <p class="lgfoot">Al usar Cuarteo se aplica el <button type="button" class="lnk" style="margin:0;font-size:13.5px" data-act="showPriv">aviso de privacidad</button>.</p></div>`;
+    <button type="button" class="lgcard" data-act="showLogin">${I.chevL}<span><b>¿Ya tienes cuenta?</b><small>Vuelve para iniciar sesión.</small></span></button></div>`;
 }
 async function afterLogin(){
-  Store.mode = 'supa'; S.save = 'ok';
+  Store.mode = 'supa'; S.save = 'ok'; S.ui.authMsg = ''; S.ui.auth = 'login';
   try { await Store.loadSupa(); } catch (e) { toast('No se pudieron cargar los datos: ' + ((e && e.message) || e)); }
   if (S.migrated) { S.migrated = false; scheduleCfg(); }
   render(); checkConsent() || checkLink();
@@ -2402,13 +2424,18 @@ const ACT = {
   login:async () => { const e = ($('#lgEmail')?.value || '').trim(), pw = $('#lgPass')?.value || ''; if (!e || !pw) { lgMsg('Escribe tu correo y tu contraseña.'); return; }
     lgMsg('Entrando…'); const {data, error} = await Store.sb.auth.signInWithPassword({email:e, password:pw});
     if (error) { lgMsg(/confirm/i.test(error.message) ? 'Confirma tu correo antes de entrar; revisa tu bandeja de entrada.' : /invalid/i.test(error.message) ? 'Correo o contraseña incorrectos.' : 'No se pudo entrar: ' + error.message); return; }
-    Store.user = data.user; await afterLogin(); },
-  signup:async () => { const e = ($('#lgEmail')?.value || '').trim(), pw = $('#lgPass')?.value || ''; if (!e || !pw) { lgMsg('Escribe un correo y una contraseña.'); return; }
+    Store.user = data.user; S.ui.authMsg = ''; await afterLogin(); },
+  showSignup:() => { S.ui.auth = 'signup'; S.ui.authMsg = ''; renderMain(); window.scrollTo(0, 0); setTimeout(() => $('#suEmail')?.focus(), 50); },
+  showLogin:() => { S.ui.auth = 'login'; S.ui.authMsg = ''; renderMain(); window.scrollTo(0, 0); },
+  signup:async () => { const e = ($('#suEmail')?.value || '').trim(), pw = $('#suPass')?.value || '', pw2 = $('#suPass2')?.value || '';
+    if (!e || !pw) { lgMsg('Escribe un correo y una contraseña.'); return; }
     if (pw.length < 8) { lgMsg('La contraseña debe tener al menos 8 caracteres.'); return; }
-    if (!$('#lgAcepto')?.checked) { lgMsg('Para crear la cuenta debes leer y aceptar el aviso de privacidad.'); return; }
+    if (pw !== pw2) { lgMsg('Las contraseñas no coinciden.'); return; }
+    if (!$('#suAcepto')?.checked) { lgMsg('Para crear la cuenta debes leer y aceptar el aviso de privacidad.'); return; }
     lgMsg('Creando la cuenta…'); const {data, error} = await Store.sb.auth.signUp({email:e, password:pw, options:{emailRedirectTo:location.origin + location.pathname, data:{acepta_privacidad:true, aviso_privacidad:PRIV_VERSION, aceptado_en:new Date().toISOString()}}});
-    if (error) { lgMsg('No se pudo crear la cuenta: ' + error.message); return; }
-    if (data && data.session) { Store.user = data.user; await afterLogin(); } else lgMsg('Cuenta creada. Revisa tu correo y confirma la cuenta; luego entra con tu contraseña.'); },
+    if (error) { lgMsg(/already|registered|exists/i.test(error.message) ? 'Ya existe una cuenta con ese correo. Vuelve a iniciar sesión.' : 'No se pudo crear la cuenta: ' + error.message); return; }
+    if (data && data.session) { Store.user = data.user; S.ui.auth = 'login'; await afterLogin(); }
+    else { S.ui.auth = 'login'; S.ui.authEmail = e; S.ui.authMsg = 'Cuenta creada. Revisa tu correo y confirma la cuenta; luego entra con tu contraseña.'; renderMain(); } },
   resetPass:async () => { const e = ($('#lgEmail')?.value || '').trim(); if (!e) { lgMsg('Escribe tu correo arriba y vuelve a tocar el botón.'); return; }
     const {error} = await Store.sb.auth.resetPasswordForEmail(e, {redirectTo:location.origin + location.pathname}); lgMsg(error ? 'No se pudo enviar el correo: ' + error.message : 'Te enviamos un correo para restablecer la contraseña.'); },
   savePass:async () => { const pw = $('#npPass')?.value || ''; if (pw.length < 8) { toast('La contraseña debe tener al menos 8 caracteres.'); return; }
