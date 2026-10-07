@@ -1,4 +1,4 @@
-# Cuarteo V 1.6
+# Cuarteo V 1.10
 
 Software para la caracterización de residuos sólidos: guía el proceso por etapas (planificación, fuentes, muestreo y cuarteo, clasificación, laboratorio, resultados e informe) y genera el informe en PDF, Excel, CSV y JSON.
 
@@ -28,6 +28,19 @@ Esta versión se publica con GitHub Pages y guarda los datos en Supabase.
 ## Actualizar a una versión nueva
 
 Reemplaza solo `index.html`. No toques `config.js`: ahí está tu conexión.
+
+## Compartir estudios y grupos de trabajo
+
+- El dueño de un estudio puede compartirlo con otra persona registrada o con un grupo, con permiso de *ver* o de *editar* (botón *Compartir* dentro del estudio).
+- En *Grupos de trabajo* se crean grupos, se agregan miembros con el correo de su cuenta y se nombran administradores. Los estudios del grupo los ven y editan todos sus miembros.
+- Si dos personas editan el mismo estudio a la vez, la app combina los cambios: conserva las fuentes, muestras y análisis que agregó cada una.
+- Requiere ejecutar `supabase-cuarteo.sql` de la V 1.10.
+
+## Privacidad
+
+- Al crear una cuenta, la persona debe aceptar el aviso de privacidad. La aceptación queda registrada en su cuenta con la versión del aviso y la fecha.
+- El nombre del responsable y el correo de contacto del aviso se configuran en `config.js`, en el bloque `privacidad`.
+- Cada usuario puede eliminar su cuenta en *Ajustes > Eliminar mi cuenta*. Se borran la cuenta, los estudios, los ajustes y las fotos. Requiere haber ejecutado `supabase-cuarteo.sql` de la V 1.7.
 
 ## Seguridad
 
