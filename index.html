@@ -392,6 +392,10 @@ dialog.wide{width:min(920px,96vw)}
 .g-plbl span{position:absolute;transform:translate(-50%,-50%);font:700 11px/1.1 var(--f-b);color:var(--ink-3);white-space:nowrap;pointer-events:none}
 .g-city span{position:absolute;left:-4px;top:-8px;display:flex;align-items:center;gap:5px;white-space:nowrap;font:700 11.5px/16px var(--f-b);color:var(--ink);text-shadow:0 0 3px var(--surface),0 0 3px var(--surface);pointer-events:none}
 .g-city span::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--ink);box-shadow:0 0 0 1.5px var(--surface);flex:none}
+/* ---------- V 1.11: perfiles ---------- */
+.pname b{display:block;font-weight:700}
+.pname small{display:block;color:var(--ink-3);font-size:12.5px}
+.acct small{display:block;color:var(--ink-3);font-size:12.5px}
 /* ---------- V 1.10: compartir y grupos ---------- */
 .ctop .acts{margin-left:auto}
 .sharebar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:12px 0 0;padding:10px 14px;border-radius:var(--r2);background:var(--blue-soft);color:var(--ink);font-size:14.5px}
@@ -688,8 +692,9 @@ const CATCOL = {
 const unidad = c => UNIDADES.find(u => u[0] === c.unidadBase) || UNIDADES[0];
 const unidadCorta = c => unidad(c)[1];
 const unidadPlural = c => unidad(c)[2];
-const APP_VERSION = 'V 1.10';
+const APP_VERSION = 'V 1.11';
 const CHANGELOG = [
+  ['V 1.11', 'Perfil de usuario con nombre, apellido y cargo u ocupación, pedido al registrarse (y una sola vez a las cuentas existentes). En grupos, estudios compartidos y en la sesión se muestra el nombre y el cargo en lugar del correo.'],
   ['V 1.10', 'Estudios compartidos entre usuarios registrados, a elección de su dueño, con permiso de ver o de editar; grupos de trabajo con administradores y miembros para hacer estudios en conjunto; combinación automática de cambios cuando dos personas editan el mismo estudio; modo de solo lectura.'],
   ['V 1.9', 'La pantalla de inicio es solo para iniciar sesión; desde un recuadro se pasa a la pantalla de registro, que pide confirmar la contraseña y aceptar el aviso de privacidad.'],
   ['V 1.8', 'En Clasificación se eligen los componentes de cada estudio (por ejemplo solo cartón, vidrio y plástico) y solo esos aparecen al pesar; los que ya tienen pesos no se pueden quitar. La pantalla de conexión con Supabase muestra un diagnóstico de config.js con la causa exacta del problema.'],
@@ -731,7 +736,7 @@ const S = {
   ready:false, ai:false, save:'idle', pick:null, modalOK:null
 };
 const PHOTO = {};
-S.grupos = []; S.accesos = []; S.shareOK = false; S.legacyDb = false; S.dirty = new Set();
+S.perfiles = {}; S.perfilesOK = false; S.grupos = []; S.accesos = []; S.shareOK = false; S.legacyDb = false; S.dirty = new Set();
 const cur = () => S.campanas.find(c => c.id === S.ui.campId);
 const compById = id => S.catalogo.componentes.find(k => k.id === id);
 const childrenOf = id => S.catalogo.componentes.filter(k => k.padre === id && k.id !== id);
@@ -1037,6 +1042,10 @@ function mergeCampaign(sv, lc){
   }
   return out;
 }
+const perfilDe = id => S.perfiles[id] || null;
+function personName(id, email){ const p = perfilDe(id); const n = p ? `${p.nombre || ''} ${p.apellido || ''}`.trim() : ''; return n || email || 'Usuario'; }
+const personCargo = id => (perfilDe(id) || {}).cargo || '';
+const personHTML = (id, email, extra = '') => `<span class="pname"><b>${esc(personName(id, email))}${extra}</b>${personCargo(id) ? `<small>${esc(personCargo(id))}</small>` : ''}</span>`;
 const isOwner = c => !c || !c._perm || c._perm === 'owner';
 const readOnly = c => !!c && c._perm === 'ver';
 const grupoNombre = id => (S.grupos.find(g => g.id === id) || {}).nombre || 'grupo';
@@ -1080,6 +1089,8 @@ const Store = {
     const uid = this.user.id;
     const [r, g, gm, ac] = await Promise.all([this.sb.from('campanas').select('owner,id,data,version,owner_email'), this.sb.from('grupos').select('id,nombre'),
       this.sb.from('grupo_miembros').select('grupo_id,user_id,email,rol'), this.sb.from('campana_accesos').select('id,owner,campana_id,user_id,email,grupo_id,permiso')]);
+    const pf = await this.sb.from('perfiles').select('id,nombre,apellido,cargo,email');
+    S.perfilesOK = !pf.error; S.perfiles = {}; (pf.data || []).forEach(x => { S.perfiles[x.id] = x; });
     let rows;
     if (r.error) { const r2 = await this.sb.from('campanas').select('owner,id,data').eq('owner', uid); if (r2.error) throw r2.error; rows = r2.data || []; S.legacyDb = true; }
     else { rows = r.data || []; S.legacyDb = false; }
@@ -1741,7 +1752,7 @@ function renderMain(){
 function hydratePhotos(){ document.querySelectorAll('img[data-photo]').forEach(async img => { const d = await Store.getPhoto(img.dataset.photo); if (d) img.src = d; }); }
 
 /* ----- aviso de privacidad ----- */
-const PRIV_VERSION = '1.1, octubre de 2026';
+const PRIV_VERSION = '1.2, octubre de 2026';
 function privConf(){ const c = (window.CUARTEO_CONFIG && window.CUARTEO_CONFIG.privacidad) || {};
   const r = String(c.responsable || '').trim(), m = String(c.contacto || '').trim();
   return {resp:/tu nombre/i.test(r) ? '' : r, mail:/tu-correo|ejemplo\.com/i.test(m) ? '' : m}; }
@@ -1750,15 +1761,36 @@ function privacyHTML(){
   const contact = mail ? `<a href="mailto:${esc(mail)}">${esc(mail)}</a>` : 'el administrador que te dio acceso';
   return `<div class="priv"><p class="hint">Versión ${PRIV_VERSION}</p>
     <h4>Responsable</h4><p>El responsable de los datos personales tratados en esta instalación de Cuarteo es ${who}. Contacto: ${contact}.</p>
-    <h4>Qué datos recogemos</h4><ul><li>Datos de la cuenta: correo electrónico y contraseña. La contraseña se guarda cifrada y nadie puede leerla.</li><li>Registros técnicos de acceso, como la fecha de registro, la fecha del último inicio de sesión y datos de conexión que generan los servicios de alojamiento.</li><li>La información que tú registras: estudios, fuentes, muestras, coordenadas GPS, resultados de laboratorio, ajustes y fotos.</li><li>Los grupos de trabajo a los que perteneces y los estudios que compartes o que otros comparten contigo.</li></ul>
+    <h4>Qué datos recogemos</h4><ul><li>Datos de tu perfil: nombre, apellido y cargo u ocupación.</li><li>Datos de la cuenta: correo electrónico y contraseña. La contraseña se guarda cifrada y nadie puede leerla.</li><li>Registros técnicos de acceso, como la fecha de registro, la fecha del último inicio de sesión y datos de conexión que generan los servicios de alojamiento.</li><li>La información que tú registras: estudios, fuentes, muestras, coordenadas GPS, resultados de laboratorio, ajustes y fotos.</li><li>Los grupos de trabajo a los que perteneces y los estudios que compartes o que otros comparten contigo.</li></ul>
     <h4>Para qué los usamos</h4><p>Para darte acceso a la aplicación, guardar y sincronizar tus estudios entre equipos, generar tus informes y dar soporte técnico. No los usamos para publicidad ni los vendemos.</p>
     <h4>Dónde se guardan</h4><p>En los servicios de Supabase (base de datos, autenticación y almacenamiento de fotos), cuyos servidores pueden estar fuera de la República Dominicana. El código de la aplicación se publica en GitHub, que no recibe tus datos. Los mapas se cargan desde CARTO y Esri, que solo reciben la zona del mapa que se está viendo.</p>
-    <h4>Quién puede verlos</h4><p>Cada usuario ve sus propios estudios y los que otros usuarios o sus grupos de trabajo deciden compartir con él. Cuando compartes un estudio, las personas o los grupos que elijas ven sus datos y fotos; si les das permiso de edición, también pueden modificarlos. Los miembros de un grupo ven el correo de los demás miembros. El administrador del proyecto puede acceder a los datos para mantenimiento y soporte, y está obligado a protegerlos. No se comparten con terceros, salvo obligación legal.</p>
+    <h4>Quién puede verlos</h4><p>Cada usuario ve sus propios estudios y los que otros usuarios o sus grupos de trabajo deciden compartir con él. Cuando compartes un estudio, las personas o los grupos que elijas ven sus datos y fotos; si les das permiso de edición, también pueden modificarlos. Los miembros de un grupo, y las personas con las que compartes un estudio, ven tu nombre, tu apellido y tu cargo. El administrador del proyecto puede acceder a los datos para mantenimiento y soporte, y está obligado a protegerlos. No se comparten con terceros, salvo obligación legal.</p>
     <h4>Las etiquetas QR son públicas</h4><p>Los datos que escribes en una fuente (código, nombre, tipo, estrato o área, población, turno, ubicación, estudio y entidad) viajan dentro de su etiqueta QR y los puede leer cualquiera que la escanee. No incluyas nombres de personas ni direcciones de viviendas.</p>
     <h4>Cuánto tiempo los conservamos</h4><p>Mientras tu cuenta esté activa. Al eliminarla se borran de forma permanente tu cuenta, tus estudios, tus ajustes, tus fotos y tu participación en grupos. Los estudios de otras personas que editaste siguen siendo de sus dueños. Los respaldos que descargues quedan bajo tu control.</p>
     <h4>Tus derechos</h4><p>Conforme a la Ley 172-13 sobre protección de datos personales puedes acceder a tus datos, corregirlos, pedir su eliminación u oponerte a su tratamiento. Desde la app puedes descargar un respaldo con todos tus datos, editarlos y eliminar tu cuenta en Ajustes. Para cualquier otra solicitud escribe a ${contact}.</p>
     <h4>Seguridad</h4><p>Las conexiones van cifradas, las contraseñas se guardan cifradas y las reglas de la base de datos impiden que un usuario vea los datos de otro.</p>
     <h4>Cambios</h4><p>Si este aviso cambia, la aplicación te pedirá que lo aceptes de nuevo.</p></div>`;
+}
+function profileComplete(p){ return !!(p && String(p.nombre || '').trim() && String(p.apellido || '').trim() && String(p.cargo || '').trim()); }
+async function saveProfile(nom, ape, car){
+  const me = Store.user.id; const row = {id:me, nombre:nom, apellido:ape, cargo:car, email:Store.user.email || '', updated_at:new Date().toISOString()};
+  const {error} = await Store.sb.from('perfiles').upsert(row, {onConflict:'id'}); if (error) throw new Error(error.message);
+  try { const r = await Store.sb.auth.updateUser({data:{nombre:nom, apellido:ape, cargo:car}}); if (r.data && r.data.user) Store.user = r.data.user; } catch (e) {}
+  S.perfiles[me] = row;
+}
+function checkProfile(){
+  if (Store.mode !== 'supa' || !Store.user || !S.perfilesOK) return false;
+  const me = Store.user.id; if (profileComplete(perfilDe(me))) return false;
+  const md = Store.user.user_metadata || {};
+  if (profileComplete(md)) { saveProfile(md.nombre.trim(), md.apellido.trim(), md.cargo.trim()).then(() => render()).catch(() => {}); return false; }
+  askProfile(true); return true;
+}
+function profileForm(p){ p = p || {}; return `<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr))"><div class="fld"><label for="pfNombre">Nombre</label><div class="inp"><input id="pfNombre" value="${esc(p.nombre || '')}" autocomplete="given-name"></div></div><div class="fld"><label for="pfApellido">Apellido</label><div class="inp"><input id="pfApellido" value="${esc(p.apellido || '')}" autocomplete="family-name"></div></div><div class="fld full"><label for="pfCargo">Cargo u ocupación</label><div class="inp"><input id="pfCargo" value="${esc(p.cargo || '')}" placeholder="Ej.: Técnico ambiental, Inspector, Ingeniero" autocomplete="organization-title"></div></div></div>`; }
+function askProfile(required){
+  S.profilePending = !!required;
+  openModal(required ? 'Completa tu perfil' : 'Mi perfil', `<p class="note" style="margin-top:0">${required ? 'Para que tus compañeros te identifiquen en los grupos y en los estudios compartidos, escribe tu nombre, tu apellido y tu cargo u ocupación.' : 'Así te identifican tus compañeros en los grupos y en los estudios compartidos.'}</p>${profileForm(perfilDe(Store.user.id) || Store.user.user_metadata)}`,
+    `${required ? '' : '<button class="btn ghost" data-act="closeModal">Cancelar</button>'}<button class="btn" data-act="profileSave">Guardar</button>`);
+  setTimeout(() => $('#pfNombre')?.focus(), 60);
 }
 function askConsent(){
   S.consentPending = true;
@@ -1767,7 +1799,7 @@ function askConsent(){
 }
 
 /* ----- acceso (Supabase) ----- */
-function acctHTML(){ return Store.mode === 'supa' && Store.user ? `<div class="acct"><span>Sesión iniciada</span><b>${esc(Store.user.email || '')}</b><button class="lnk" data-act="logout">Cerrar sesión</button></div>` : ''; }
+function acctHTML(){ if (!(Store.mode === 'supa' && Store.user)) return ''; const me = Store.user.id; return `<div class="acct"><span>Sesión iniciada</span><b>${esc(personName(me, Store.user.email))}</b>${personCargo(me) ? `<small>${esc(personCargo(me))}</small>` : ''}<button class="lnk" data-act="editProfile">Mi perfil</button><button class="lnk" style="margin-top:0" data-act="logout">Cerrar sesión</button></div>`; }
 const lgMsg = t => { const el = $('#lgMsg'); if (el) el.textContent = t; };
 function hashFicha(){
   const src = (location.hash && location.hash.length > 1 ? location.hash : BOOT_HASH) || '';
@@ -1818,7 +1850,9 @@ function viewLogin(){
 }
 function viewSignup(){
   return `<div class="login">${brandHTML()}<p class="lede">Crear una cuenta</p>
-    <div class="lgform"><div class="fld"><label for="suEmail">Correo</label><div class="inp"><input id="suEmail" type="email" autocomplete="email" inputmode="email"></div></div>
+    <div class="lgform"><div class="grid" style="grid-template-columns:1fr 1fr;gap:14px"><div class="fld"><label for="suNombre">Nombre</label><div class="inp"><input id="suNombre" autocomplete="given-name"></div></div><div class="fld"><label for="suApellido">Apellido</label><div class="inp"><input id="suApellido" autocomplete="family-name"></div></div></div>
+    <div class="fld"><label for="suCargo">Cargo u ocupación</label><div class="inp"><input id="suCargo" autocomplete="organization-title" placeholder="Ej.: Técnico ambiental, Inspector, Ingeniero"></div></div>
+    <div class="fld"><label for="suEmail">Correo</label><div class="inp"><input id="suEmail" type="email" autocomplete="email" inputmode="email"></div></div>
     <div class="fld"><label for="suPass">Contraseña</label><div class="inp"><input id="suPass" type="password" autocomplete="new-password"></div><p class="hint">Mínimo 8 caracteres.</p></div>
     <div class="fld"><label for="suPass2">Repite la contraseña</label><div class="inp"><input id="suPass2" type="password" autocomplete="new-password"></div></div>
     <label class="chkl" style="font-weight:400;font-size:14.5px"><input type="checkbox" id="suAcepto"><span>He leído y acepto el <button type="button" class="lnk" style="margin:0;font-size:14.5px" data-act="showPriv">aviso de privacidad</button>.</span></label></div>
@@ -1830,8 +1864,9 @@ async function afterLogin(){
   Store.mode = 'supa'; S.save = 'ok'; S.ui.authMsg = ''; S.ui.auth = 'login';
   try { await Store.loadSupa(); } catch (e) { toast('No se pudieron cargar los datos: ' + ((e && e.message) || e)); }
   if (S.migrated) { S.migrated = false; scheduleCfg(); }
-  render(); checkConsent() || checkLink();
+  render(); postLoginChecks();
 }
+function postLoginChecks(){ if (checkConsent()) return; if (checkProfile()) return; checkLink(); }
 function checkConsent(){
   if (Store.mode !== 'supa' || !Store.user) return false;
   const md = Store.user.user_metadata || {}; if (md.aviso_privacidad === PRIV_VERSION) return false;
@@ -1849,7 +1884,7 @@ function viewGrupos(){
   const me = Store.user.id;
   const cards = S.grupos.map(g => { const admin = g.rol === 'admin';
     const studies = S.campanas.filter(c => S.accesos.some(a => a.grupo_id === g.id && a.owner === c._owner && a.campana_id === c.id));
-    const members = g.miembros.map(m => `<tr><td>${esc(m.email || '')}${m.user_id === me ? ' <span class="chip">tú</span>' : ''}</td><td>${admin && m.user_id !== me ? `<div class="inp inl"><select data-grole="${g.id}|${m.user_id}" aria-label="Rol"><option value="miembro"${m.rol !== 'admin' ? ' selected' : ''}>Miembro</option><option value="admin"${m.rol === 'admin' ? ' selected' : ''}>Administrador</option></select></div>` : (m.rol === 'admin' ? 'Administrador' : 'Miembro')}</td><td class="num">${admin && m.user_id !== me ? `<button class="ib" data-act="grpRemove" data-g="${g.id}" data-u="${m.user_id}" title="Quitar del grupo" aria-label="Quitar del grupo">${I.x}</button>` : ''}</td></tr>`).join('');
+    const members = g.miembros.map(m => `<tr><td>${personHTML(m.user_id, m.email, m.user_id === me ? ' <span class="chip">tú</span>' : '')}</td><td>${admin && m.user_id !== me ? `<div class="inp inl"><select data-grole="${g.id}|${m.user_id}" aria-label="Rol"><option value="miembro"${m.rol !== 'admin' ? ' selected' : ''}>Miembro</option><option value="admin"${m.rol === 'admin' ? ' selected' : ''}>Administrador</option></select></div>` : (m.rol === 'admin' ? 'Administrador' : 'Miembro')}</td><td class="num">${admin && m.user_id !== me ? `<button class="ib" data-act="grpRemove" data-g="${g.id}" data-u="${m.user_id}" title="Quitar del grupo" aria-label="Quitar del grupo">${I.x}</button>` : ''}</td></tr>`).join('');
     return `<div class="sitem open" style="margin-bottom:14px"><div class="shead" style="cursor:default"><span class="mcode">${I.users}</span><span class="st"><b>${esc(g.nombre)}</b><small>${g.miembros.length} ${g.miembros.length === 1 ? 'miembro' : 'miembros'}. Tu rol: ${admin ? 'administrador' : 'miembro'}</small></span><span class="sp"></span>${admin ? `<button class="ib" data-act="grpRename" data-g="${g.id}" title="Cambiar nombre" aria-label="Cambiar nombre">${I.doc}</button><button class="ib" data-act="grpDelete" data-g="${g.id}" title="Eliminar grupo" aria-label="Eliminar grupo">${I.trash}</button>` : ''}</div>
       <div class="sbody"><div class="sub"><h4>Miembros</h4><div class="tw"><table class="tbl shlist"><tbody>${members}</tbody></table></div>
         ${admin ? `<div class="grp-add"><div class="inp" style="flex:1;min-width:220px"><input id="add_${g.id}" type="email" placeholder="Correo de un usuario registrado" autocomplete="off"></div><div class="inp inl"><select id="rol_${g.id}" aria-label="Rol"><option value="miembro">Miembro</option><option value="admin">Administrador</option></select></div><button class="btn sm" data-act="grpAdd" data-g="${g.id}">${I.plus} Agregar</button></div><p class="hint">La persona tiene que haber creado su cuenta en Cuarteo.</p>` : ''}</div>
@@ -1859,7 +1894,7 @@ function viewGrupos(){
 }
 function openShare(c){
   if (!c) return; const acc = S.accesos.filter(a => a.owner === c._owner && a.campana_id === c.id);
-  const rows = acc.map(a => `<tr><td>${a.grupo_id ? `${I.users} Grupo ${esc(grupoNombre(a.grupo_id))}` : esc(a.email || 'usuario')}</td><td><div class="inp inl"><select data-acperm="${a.id}" aria-label="Permiso"><option value="editar"${a.permiso === 'editar' ? ' selected' : ''}>Puede editar</option><option value="ver"${a.permiso === 'ver' ? ' selected' : ''}>Solo puede ver</option></select></div></td><td class="num"><button class="ib" data-act="shareRemove" data-a="${a.id}" title="Dejar de compartir" aria-label="Dejar de compartir">${I.x}</button></td></tr>`).join('');
+  const rows = acc.map(a => `<tr><td>${a.grupo_id ? `${I.users} Grupo ${esc(grupoNombre(a.grupo_id))}` : personHTML(a.user_id, a.email)}</td><td><div class="inp inl"><select data-acperm="${a.id}" aria-label="Permiso"><option value="editar"${a.permiso === 'editar' ? ' selected' : ''}>Puede editar</option><option value="ver"${a.permiso === 'ver' ? ' selected' : ''}>Solo puede ver</option></select></div></td><td class="num"><button class="ib" data-act="shareRemove" data-a="${a.id}" title="Dejar de compartir" aria-label="Dejar de compartir">${I.x}</button></td></tr>`).join('');
   S.shareCamp = c.id;
   openModal(`Compartir: ${esc(c.nombre || 'Estudio sin título')}`, `<p class="note" style="margin-top:0">Elige con quién compartir este estudio. Solo tú, como dueño, puedes cambiar estos permisos o eliminarlo.</p>
     ${rows ? `<div class="tw"><table class="tbl shlist"><tbody>${rows}</tbody></table></div>` : '<p class="hint">Todavía no lo compartes con nadie.</p>'}
@@ -1882,7 +1917,7 @@ async function createCamp(groupId){
 /* ----- panel ----- */
 function shareChip(c){
   if (Store.mode !== 'supa') return '';
-  if (!isOwner(c)) return `<span class="chip blue">${I.share} De ${esc(c._ownerEmail || 'otro usuario')}${readOnly(c) ? ', solo lectura' : ''}</span>`;
+  if (!isOwner(c)) return `<span class="chip blue">${I.share} De ${esc(personName(c._owner, c._ownerEmail || 'otro usuario'))}${readOnly(c) ? ', solo lectura' : ''}</span>`;
   const acc = S.accesos.filter(a => a.owner === c._owner && a.campana_id === c.id); if (!acc.length) return '';
   const g = acc.filter(a => a.grupo_id).map(a => grupoNombre(a.grupo_id)); const u = acc.filter(a => a.user_id).length;
   return `<span class="chip">${I.share} Compartido${g.length ? ' con ' + esc(g.join(', ')) : ''}${u ? `${g.length ? ' y' : ' con'} ${u} ${u === 1 ? 'persona' : 'personas'}` : ''}</span>`;
@@ -1924,7 +1959,7 @@ function viewCamp(){
   const body = [stPlan, stFuentes, stMuestreo, stClasif, stLab, stResult, stInforme][i](c);
   return `<button class="back" data-act="nav" data-v="panel">${I.chevL} Caracterizaciones</button>
     <div class="ctop"><div id="ringBox">${ring(c, 58)}</div><div style="min-width:0"><h1 class="ctitle" id="campTitle">${esc(c.nombre || 'Estudio sin título')}</h1><div class="cmeta" id="campMeta">${esc(campMeta(c))}</div></div>${Store.mode === 'supa' && S.shareOK && isOwner(c) ? `<div class="acts"><button class="btn ghost sm" data-act="share">${I.share} Compartir</button></div>` : ''}</div>
-    ${Store.mode === 'supa' && !isOwner(c) ? `<div class="sharebar">${I.share}<span>Estudio compartido contigo por <b>${esc(c._ownerEmail || 'otro usuario')}</b>. ${readOnly(c) ? 'Solo puedes verlo y descargar sus informes.' : 'Puedes editarlo; los cambios los ven todos los que tienen acceso.'}</span></div>` : ''}
+    ${Store.mode === 'supa' && !isOwner(c) ? `<div class="sharebar">${I.share}<span>Estudio compartido contigo por <b>${esc(personName(c._owner, c._ownerEmail || 'otro usuario'))}</b>${personCargo(c._owner) ? ', ' + esc(personCargo(c._owner)) : ''}. ${readOnly(c) ? 'Solo puedes verlo y descargar sus informes.' : 'Puedes editarlo; los cambios los ven todos los que tienen acceso.'}</span></div>` : ''}
     <nav class="stages" id="stageBar" aria-label="Etapas">${stageBarHTML(c)}</nav>
     <div class="stagewrap"><section class="stage" aria-label="${STAGES[i]}">${body}
       <div class="stnav"><button class="btn ghost" data-act="prev"${i === 0 ? ' disabled' : ''}>${I.chevL} ${i > 0 ? STAGES[i - 1] : 'Anterior'}</button><span class="sp"></span><button class="btn" data-act="next">${i < 6 ? 'Siguiente: ' + STAGES[i + 1] : 'Terminar'} ${I.chevR}</button></div></section>
@@ -2165,7 +2200,7 @@ function viewAjustes(){
   const t = lsGet('cuarteo.theme') || '';
   return `<header class="phead"><div><h1 class="disp">Ajustes</h1><p class="lede">Unidades, báscula, límites de alerta, etiquetas QR, integración con otros sistemas y respaldos.</p></div></header>
   <div class="blk"><h3>Dónde se guardan los datos</h3>${IN_CLAUDE ? `<p class="note">${esc(storeLabel())}. Esta es la versión de Cuarteo dentro de Claude.</p>`
-    : Store.mode === 'supa' ? `<p class="note">Guardado en la nube, en tu proyecto de Supabase (${esc((sbConf() || {u:''}).u.replace(/^https?:\/\//, ''))}). Sesión iniciada como <b>${esc(Store.user?.email || '')}</b>.</p><div class="acts"><button class="btn ghost" data-act="logout">Cerrar sesión</button><button class="btn ghost" data-act="showPriv">Aviso de privacidad</button><button class="btn ghost danger" data-act="delAccount">Eliminar mi cuenta</button>${sbConf() && !sbConf().embedded ? '<button class="btn ghost danger" data-act="sbDisconnect">Desconectar este navegador</button>' : ''}</div>`
+    : Store.mode === 'supa' ? `<p class="note">Guardado en la nube, en tu proyecto de Supabase (${esc((sbConf() || {u:''}).u.replace(/^https?:\/\//, ''))}). Sesión iniciada como <b>${esc(personName(Store.user?.id, Store.user?.email))}</b>${personCargo(Store.user?.id) ? ', ' + esc(personCargo(Store.user?.id)) : ''} (${esc(Store.user?.email || '')}).</p><div class="acts"><button class="btn ghost" data-act="editProfile">Mi perfil</button><button class="btn ghost" data-act="logout">Cerrar sesión</button><button class="btn ghost" data-act="showPriv">Aviso de privacidad</button><button class="btn ghost danger" data-act="delAccount">Eliminar mi cuenta</button>${sbConf() && !sbConf().embedded ? '<button class="btn ghost danger" data-act="sbDisconnect">Desconectar este navegador</button>' : ''}</div>`
     : `<p class="note">${esc(storeLabel())}. Conéctalo a Supabase para ver tus estudios desde cualquier equipo.</p><button class="btn ghost" data-act="sbConnect">Conectar con Supabase</button>`}</div>
   <div class="blk"><h3>Unidades de medida</h3><p class="note">Los datos se guardan en el sistema métrico y se convierten al mostrarlos y al generar los informes y la hoja de cálculo. El paquete JSON para ERP siempre se exporta en unidades del SI.</p>
     <div class="segs"><button class="seg${SYS() === 'MKS' ? ' on' : ''}" data-act="setUnits" data-v="MKS">Sistema métrico (MKS)</button><button class="seg${SYS() === 'ING' ? ' on' : ''}" data-act="setUnits" data-v="ING">Sistema inglés</button></div>
@@ -2592,11 +2627,13 @@ const ACT = {
   showSignup:() => { S.ui.auth = 'signup'; S.ui.authMsg = ''; renderMain(); window.scrollTo(0, 0); setTimeout(() => $('#suEmail')?.focus(), 50); },
   showLogin:() => { S.ui.auth = 'login'; S.ui.authMsg = ''; renderMain(); window.scrollTo(0, 0); },
   signup:async () => { const e = ($('#suEmail')?.value || '').trim(), pw = $('#suPass')?.value || '', pw2 = $('#suPass2')?.value || '';
+    const nom = ($('#suNombre')?.value || '').trim(), ape = ($('#suApellido')?.value || '').trim(), car = ($('#suCargo')?.value || '').trim();
+    if (!nom || !ape || !car) { lgMsg('Escribe tu nombre, tu apellido y tu cargo u ocupación.'); return; }
     if (!e || !pw) { lgMsg('Escribe un correo y una contraseña.'); return; }
     if (pw.length < 8) { lgMsg('La contraseña debe tener al menos 8 caracteres.'); return; }
     if (pw !== pw2) { lgMsg('Las contraseñas no coinciden.'); return; }
     if (!$('#suAcepto')?.checked) { lgMsg('Para crear la cuenta debes leer y aceptar el aviso de privacidad.'); return; }
-    lgMsg('Creando la cuenta…'); const {data, error} = await Store.sb.auth.signUp({email:e, password:pw, options:{emailRedirectTo:location.origin + location.pathname, data:{acepta_privacidad:true, aviso_privacidad:PRIV_VERSION, aceptado_en:new Date().toISOString()}}});
+    lgMsg('Creando la cuenta…'); const {data, error} = await Store.sb.auth.signUp({email:e, password:pw, options:{emailRedirectTo:location.origin + location.pathname, data:{acepta_privacidad:true, aviso_privacidad:PRIV_VERSION, aceptado_en:new Date().toISOString(), nombre:nom, apellido:ape, cargo:car}}});
     if (error) { lgMsg(/already|registered|exists/i.test(error.message) ? 'Ya existe una cuenta con ese correo. Vuelve a iniciar sesión.' : 'No se pudo crear la cuenta: ' + error.message); return; }
     if (data && data.session) { Store.user = data.user; S.ui.auth = 'login'; await afterLogin(); }
     else { S.ui.auth = 'login'; S.ui.authEmail = e; S.ui.authMsg = 'Cuenta creada. Revisa tu correo y confirma la cuenta; luego entra con tu contraseña.'; renderMain(); } },
@@ -2604,10 +2641,15 @@ const ACT = {
     const {error} = await Store.sb.auth.resetPasswordForEmail(e, {redirectTo:location.origin + location.pathname}); lgMsg(error ? 'No se pudo enviar el correo: ' + error.message : 'Te enviamos un correo para restablecer la contraseña.'); },
   savePass:async () => { const pw = $('#npPass')?.value || ''; if (pw.length < 8) { toast('La contraseña debe tener al menos 8 caracteres.'); return; }
     const {error} = await Store.sb.auth.updateUser({password:pw}); if (error) { toast('No se pudo cambiar: ' + error.message); return; } closeModal(); toast('Contraseña actualizada.'); },
+  profileSave:async el => { const nom = ($('#pfNombre')?.value || '').trim(), ape = ($('#pfApellido')?.value || '').trim(), car = ($('#pfCargo')?.value || '').trim();
+    if (!nom || !ape || !car) { toast('Escribe tu nombre, tu apellido y tu cargo u ocupación.'); return; }
+    el.disabled = true; try { await saveProfile(nom, ape, car); } catch (e) { el.disabled = false; toast(/perfiles|relation|schema cache/i.test(e.message) ? 'Falta actualizar la base de datos: ejecuta otra vez supabase-cuarteo.sql en Supabase.' : 'No se pudo guardar el perfil: ' + e.message); return; }
+    const wasReq = S.profilePending; S.profilePending = false; closeModal(); render(); toast('Perfil guardado.'); if (wasReq) checkLink(); },
+  editProfile:() => askProfile(false),
   showPriv:() => { if (S.consentPending) return; openModal('Aviso de privacidad', privacyHTML(), '<button class="btn" data-act="closeModal">Cerrar</button>', 'wide'); },
   consentYes:async el => { el.disabled = true; const {data, error} = await Store.sb.auth.updateUser({data:{acepta_privacidad:true, aviso_privacidad:PRIV_VERSION, aceptado_en:new Date().toISOString()}});
     if (error) { el.disabled = false; toast('No se pudo registrar tu aceptación: ' + error.message); return; }
-    if (data && data.user) Store.user = data.user; S.consentPending = false; closeModal(); toast('Gracias. Aceptaste el aviso de privacidad.'); checkLink(); },
+    if (data && data.user) Store.user = data.user; S.consentPending = false; closeModal(); toast('Gracias. Aceptaste el aviso de privacidad.'); postLoginChecks(); },
   consentNo:() => { S.consentPending = false; closeModal(); ACT.logout(); toast('Sin aceptar el aviso de privacidad no puedes usar la cuenta. Si quieres eliminarla, escribe al administrador.'); },
   delAccount:() => openModal('Eliminar mi cuenta', `<p>Se eliminarán de forma permanente tu cuenta, tus ${S.campanas.length} ${S.campanas.length === 1 ? 'estudio' : 'estudios'}, tus ajustes y todas tus fotos. Esta acción no se puede deshacer.</p><p class="note">Si quieres conservar una copia, descarga antes un respaldo con fotos.</p><div class="grid"><div class="fld full"><label for="delConf">Escribe ELIMINAR para confirmar</label><div class="inp"><input id="delConf" autocomplete="off"></div></div></div>`,
     `<button class="btn ghost" data-act="backup">${I.dl} Descargar respaldo</button><span class="sp"></span><button class="btn ghost" data-act="closeModal">Cancelar</button><button class="btn" style="background:var(--red);border-color:var(--red)" data-act="delAccountGo">Eliminar definitivamente</button>`),
@@ -2778,6 +2820,7 @@ document.addEventListener('input', e => {
   if (el.dataset && el.dataset.bind && el.tagName !== 'BUTTON') applyBind(el);
 });
 $('#modal').addEventListener('close', () => { if (S.consentPending) { S.consentPending = false; setTimeout(() => ACT.logout(), 0); }
+  if (S.profilePending) { S.profilePending = false; setTimeout(() => { ACT.logout(); toast('Completa tu perfil para usar Cuarteo.'); }, 0); }
   S.pick = null; if (GEOMAP) { GEOMAP.remove(); GEOMAP = null; } S.geo = null; if (S.ui.view === 'camp' && S.ui.stage === 3) live(); });
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && Store.mode === 'supa' && Date.now() - (Store.loadedAt || 0) > 60000 && !$('#modal').open) reloadCloud(true); });
 let rzT = null; window.addEventListener('resize', () => { clearTimeout(rzT); rzT = setTimeout(() => { const d = document.querySelector('details.guide'); if (d) d.open = window.matchMedia('(min-width:1101px)').matches || d.open; }, 200); });
@@ -2789,7 +2832,7 @@ if (window.matchMedia) window.matchMedia('(prefers-color-scheme: dark)').addEven
   renderShell(); renderMain();
   Store.init().catch(e => console.warn(e)).finally(() => {
     S.ready = true; render(); if (S.migrated && Store.mode !== 'login' && Store.mode !== 'setup') { S.migrated = false; scheduleCfg(); }
-    checkConsent() || checkLink(); window.addEventListener('hashchange', () => { if (Store.mode === 'login') renderMain(); else checkLink(); });
+    postLoginChecks(); window.addEventListener('hashchange', () => { if (Store.mode === 'login') renderMain(); else checkLink(); });
     setTimeout(() => tilesOK(), 800);
     setTimeout(() => loadLib('qr').catch(() => {}), 1500);
     cap('sample').then(s => { S.ai = !!s; if (S.ai && S.ui.view === 'camp' && S.ui.stage === 6) renderMain(); });
