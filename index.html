@@ -625,13 +625,14 @@ function loadBrand(){
   const t = v => String(v || '').trim();
   if (t(m.nombre)) BRAND.nombre = t(m.nombre); BRAND.corto = t(m.nombreCorto) || BRAND.nombre; if (t(m.subtitulo)) BRAND.sub = t(m.subtitulo);
   BRAND.inst = t(m.institucion); BRAND.dep = t(m.dependencia); BRAND.logo = t(m.logo); BRAND.autor = t(m.autor); BRAND.normativa = t(m.normativa);
-  BRAND.primario = hexOk(m.colores && m.colores.principal); BRAND.oscuro = hexOk(m.colores && m.colores.oscuro); BRAND.acento = hexOk(m.colores && m.colores.acento); BRAND.custom = true;
+  BRAND.primario = hexOk(m.colores && m.colores.principal); BRAND.oscuro = hexOk(m.colores && m.colores.oscuro); BRAND.acento = hexOk(m.colores && m.colores.acento); BRAND.fondo = hexOk(m.colores && m.colores.fondo); BRAND.custom = true;
   document.title = BRAND.nombre;
   if (BRAND.primario) { const P = BRAND.primario; const ink = lumOf(P) > .45 ? '#14302A' : '#FFFFFF';
     const dark = `--leaf:color-mix(in srgb,${P} 60%,#fff);--leaf-2:color-mix(in srgb,${P} 40%,#fff);--leaf-soft:color-mix(in srgb,${P} 28%,#0E1916);--leaf-ink:#06130E`;
     let st = document.getElementById('brandCss'); if (!st) { st = document.createElement('style'); st.id = 'brandCss'; document.head.appendChild(st); }
     const A = BRAND.acento; const acc = A ? `.stg.on{border-bottom-color:${A}}.nv.on{box-shadow:inset 3px 0 0 ${A}}.vtag{box-shadow:inset 0 -2px 0 ${A}}` : '';
-    st.textContent = acc + `:root{--leaf:${P};--leaf-2:color-mix(in srgb,${P} 78%,#000);--leaf-soft:color-mix(in srgb,${P} 14%,#fff);--leaf-ink:${ink}}@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){${dark}}}:root[data-theme="dark"]{${dark}}`; }
+    const F = BRAND.fondo; const bg = F ? `--paper:${F};--sunk:color-mix(in srgb,${F} 88%,${P} 12%);--line:color-mix(in srgb,${F} 80%,${P} 20%);--line-2:color-mix(in srgb,${F} 68%,${P} 32%);` : '';
+    st.textContent = acc + `:root{${bg}--leaf:${P};--leaf-2:color-mix(in srgb,${P} 78%,#000);--leaf-soft:color-mix(in srgb,${P} 14%,#fff);--leaf-ink:${ink}}@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){${dark}}}:root[data-theme="dark"]{${dark}}`; }
 }
 async function prepLogo(){
   if (!BRAND.logo) return;
@@ -724,7 +725,7 @@ const unidadCorta = c => unidad(c)[1];
 const unidadPlural = c => unidad(c)[2];
 const APP_VERSION = 'V 1.13';
 const CHANGELOG = [
-  ['V 1.13', 'Color de acento institucional en la marca (pestaña activa, menú y títulos del PDF); el logo se muestra sobre fondo blanco para que se lea también en modo oscuro.'],
+  ['V 1.13', 'Color de acento institucional en la marca (pestaña activa, menú y títulos del PDF); color de fondo personalizable; el logo se muestra sobre fondo blanco para que se lea también en modo oscuro.'],
   ['V 1.12', 'Marca personalizable desde config.js (nombre, institución, logo, colores, encabezado del PDF y normativa por defecto) para usar la misma plataforma en distintas instituciones; mención de licencia de uso cuando se personaliza.'],
   ['V 1.11', 'Perfil de usuario con nombre, apellido y cargo u ocupación, pedido al registrarse (y una sola vez a las cuentas existentes). En grupos, estudios compartidos y en la sesión se muestra el nombre y el cargo en lugar del correo.'],
   ['V 1.10', 'Estudios compartidos entre usuarios registrados, a elección de su dueño, con permiso de ver o de editar; grupos de trabajo con administradores y miembros para hacer estudios en conjunto; combinación automática de cambios cuando dos personas editan el mismo estudio; modo de solo lectura.'],
@@ -2365,7 +2366,7 @@ async function exportPDF(c){
     for (const para of String(t).split(/\n+/)) { if (!para.trim()) continue; for (const ln of doc.splitTextToSize(P(para.trim()), CW)) { need(5.2); doc.text(ln, M, y); y += 5; } y += 2; } };
   const TABLE = (head, body, opt = {}) => { const {styles, ...rest} = opt; doc.autoTable({startY:y, head:[head.map(P)], body:body.map(r => r.map(v => P(v == null ? '' : String(v)))), margin:{left:M, right:M, top:22, bottom:20}, theme:'grid',
     styles:{font:'helvetica', fontSize:8.6, cellPadding:1.8, textColor:[35, 40, 38], lineColor:[214, 222, 212], lineWidth:.2, overflow:'linebreak', ...(styles || {})},
-    headStyles:{fillColor:LEAF, textColor:255, fontStyle:'bold', lineColor:LEAF}, alternateRowStyles:{fillColor:[244, 247, 242]}, ...rest}); y = doc.lastAutoTable.finalY + 7; };
+    headStyles:{fillColor:LEAF, textColor:255, fontStyle:'bold', lineColor:LEAF}, alternateRowStyles:{fillColor:BRAND.fondo ? hexRGB(BRAND.fondo) : [244, 247, 242]}, ...rest}); y = doc.lastAutoTable.finalY + 7; };
   const qlogo = (x, yy, r) => { doc.setDrawColor(255); doc.setLineWidth(.6); doc.circle(x, yy, r, 'S'); doc.setFillColor(77, 187, 140);
     const sg = (a0) => { const pts = []; for (let a = a0; a <= a0 + 90; a += 10) pts.push([x + r * Math.cos(a * Math.PI / 180), yy + r * Math.sin(a * Math.PI / 180)]);
       const lines = [[pts[0][0] - x, pts[0][1] - yy]]; for (let i = 1; i < pts.length; i++) lines.push([pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]]); lines.push([x - pts[pts.length - 1][0], yy - pts[pts.length - 1][1]]); doc.lines(lines, x, yy, [1, 1], 'F', true); };
