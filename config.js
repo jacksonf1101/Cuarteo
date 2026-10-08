@@ -7,7 +7,17 @@ window.CUARTEO_CONFIG = {
   supabaseUrl: 'https://kalzxqtnmijhgydhakou.supabase.co',
   supabaseAnonKey: 'sb_publishable_ASmEUhq8iGxFZPCkcxvaZw_Vx_iHkHv',
    privacidad: {
-    responsable: 'JC Waste Management',
-    contacto: 'pereyrajackson@gmail.com'
+    responsable: 'Ministerio de Medio Ambiente y Recursos Naturales, Dirección de Gestión Integral de Residuos Sólidos',
+    contacto: 'CORREO-INSTITUCIONAL'
+  },
+  marca: {
+    nombre: 'Plataforma de Caracterización de Residuos Sólidos',
+    nombreCorto: 'Caracterización de Residuos',
+    institucion: 'Ministerio de Medio Ambiente y Recursos Naturales',
+    dependencia: 'Dirección de Gestión Integral de Residuos Sólidos',
+    logo: 'logo-mmarn.png',
+    colores: { principal: '#032A5A', oscuro: '#021C3D', acento: '#E11516' },
+    autor: 'JC Waste Management',
+    normativa: 'Ley 225-20 General de Gestión Integral y Coprocesamiento de Residuos Sólidos, su reglamento (Decreto 320-21) y Ley 98-25, República Dominicana'
   }
 };
