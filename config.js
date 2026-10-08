@@ -8,7 +8,7 @@ window.CUARTEO_CONFIG = {
   supabaseAnonKey: 'sb_publishable_ASmEUhq8iGxFZPCkcxvaZw_Vx_iHkHv',
    privacidad: {
     responsable: 'Ministerio de Medio Ambiente y Recursos Naturales, Dirección de Gestión Integral de Residuos Sólidos',
-    contacto: 'CORREO-INSTITUCIONAL'
+    contacto: 'sofia.qureshi@ambiente.gob.do'
   },
   marca: {
     nombre: 'Plataforma de Caracterización de Residuos Sólidos',
