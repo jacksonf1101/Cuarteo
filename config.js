@@ -16,7 +16,7 @@ window.CUARTEO_CONFIG = {
     institucion: 'Ministerio de Medio Ambiente y Recursos Naturales',
     dependencia: 'Dirección de Gestión Integral de Residuos Sólidos',
     logo: 'logo-mmarn.png',
-    colores: { principal: '#032A5A', oscuro: '#021C3D', acento: '#E11516' },
+    colores: { principal: '#032A5A', oscuro: '#021C3D', acento: '#E11516', fondo: '#EAF4FB' },
     autor: 'JC Waste Management',
     normativa: 'Ley 225-20 General de Gestión Integral y Coprocesamiento de Residuos Sólidos, su reglamento (Decreto 320-21) y Ley 98-25, República Dominicana'
   }
