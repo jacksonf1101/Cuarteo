@@ -392,6 +392,12 @@ dialog.wide{width:min(920px,96vw)}
 .g-plbl span{position:absolute;transform:translate(-50%,-50%);font:700 11px/1.1 var(--f-b);color:var(--ink-3);white-space:nowrap;pointer-events:none}
 .g-city span{position:absolute;left:-4px;top:-8px;display:flex;align-items:center;gap:5px;white-space:nowrap;font:700 11.5px/16px var(--f-b);color:var(--ink);text-shadow:0 0 3px var(--surface),0 0 3px var(--surface);pointer-events:none}
 .g-city span::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--ink);box-shadow:0 0 0 1.5px var(--surface);flex:none}
+/* ---------- V 1.12: marca ---------- */
+.brand.col{flex-direction:column;align-items:flex-start;gap:10px}
+.lgbrand.col{flex-direction:column;align-items:flex-start;gap:4px}
+.blogo{object-fit:contain;background:#fff;padding:6px 10px;border-radius:10px;box-sizing:content-box}
+.mtop .blogo{max-width:120px!important}
+.spin{width:38px;height:38px;border-radius:50%;border:4px solid var(--line);border-top-color:var(--leaf);animation:spin 1s linear infinite}
 /* ---------- V 1.11: perfiles ---------- */
 .pname b{display:block;font-weight:700}
 .pname small{display:block;color:var(--ink-3);font-size:12.5px}
@@ -611,6 +617,30 @@ const PATHS = {
   share:'M18 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM6 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM18 22a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM8.6 13.5l6.8 4M15.4 6.5l-6.8 4', layers:'M12 3l9 5-9 5-9-5zM3 13l9 5 9-5'
 };
 const I = Object.fromEntries(Object.entries(PATHS).map(([k, d]) => [k, `<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="${d}"/></svg>`]));
+const BRAND = {nombre:'Cuarteo', corto:'Cuarteo', sub:'Caracterización de residuos sólidos', inst:'', dep:'', logo:'', primario:'', oscuro:'', autor:'', normativa:'', custom:false, logoData:null, logoRatio:1};
+const hexOk = v => /^#[0-9a-f]{6}$/i.test(String(v || '').trim()) ? String(v).trim() : '';
+const lumOf = h => { const [r, g, b] = [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16) / 255).map(c => c <= .03928 ? c / 12.92 : Math.pow((c + .055) / 1.055, 2.4)); return .2126 * r + .7152 * g + .0722 * b; };
+function loadBrand(){
+  const m = window.CUARTEO_CONFIG && window.CUARTEO_CONFIG.marca; if (!m || typeof m !== 'object') return;
+  const t = v => String(v || '').trim();
+  if (t(m.nombre)) BRAND.nombre = t(m.nombre); BRAND.corto = t(m.nombreCorto) || BRAND.nombre; if (t(m.subtitulo)) BRAND.sub = t(m.subtitulo);
+  BRAND.inst = t(m.institucion); BRAND.dep = t(m.dependencia); BRAND.logo = t(m.logo); BRAND.autor = t(m.autor); BRAND.normativa = t(m.normativa);
+  BRAND.primario = hexOk(m.colores && m.colores.principal); BRAND.oscuro = hexOk(m.colores && m.colores.oscuro); BRAND.acento = hexOk(m.colores && m.colores.acento); BRAND.custom = true;
+  document.title = BRAND.nombre;
+  if (BRAND.primario) { const P = BRAND.primario; const ink = lumOf(P) > .45 ? '#14302A' : '#FFFFFF';
+    const dark = `--leaf:color-mix(in srgb,${P} 60%,#fff);--leaf-2:color-mix(in srgb,${P} 40%,#fff);--leaf-soft:color-mix(in srgb,${P} 28%,#0E1916);--leaf-ink:#06130E`;
+    let st = document.getElementById('brandCss'); if (!st) { st = document.createElement('style'); st.id = 'brandCss'; document.head.appendChild(st); }
+    const A = BRAND.acento; const acc = A ? `.stg.on{border-bottom-color:${A}}.nv.on{box-shadow:inset 3px 0 0 ${A}}.vtag{box-shadow:inset 0 -2px 0 ${A}}` : '';
+    st.textContent = acc + `:root{--leaf:${P};--leaf-2:color-mix(in srgb,${P} 78%,#000);--leaf-soft:color-mix(in srgb,${P} 14%,#fff);--leaf-ink:${ink}}@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){${dark}}}:root[data-theme="dark"]{${dark}}`; }
+}
+async function prepLogo(){
+  if (!BRAND.logo) return;
+  try { const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = BRAND.logo; });
+    const sc = Math.min(1, 900 / Math.max(img.naturalWidth, img.naturalHeight)); const cv = document.createElement('canvas'); cv.width = Math.round(img.naturalWidth * sc); cv.height = Math.round(img.naturalHeight * sc);
+    cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height); BRAND.logoData = cv.toDataURL('image/png'); BRAND.logoRatio = cv.width / cv.height; }
+  catch (e) { console.warn('No se pudo cargar el logo', BRAND.logo); BRAND.logo = ''; }
+}
+const brandSoftware = () => BRAND.custom ? `${BRAND.nombre} ${APP_VERSION} (basado en Cuarteo)` : `Cuarteo ${APP_VERSION}`;
 const logo = (s = 34) => `<svg class="logo" width="${s}" height="${s}" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="13" fill="none" stroke="currentColor" stroke-width="2"/><path d="M16 16V3a13 13 0 0 0-13 13z" fill="var(--leaf)"/><path d="M16 16v13a13 13 0 0 0 13-13z" fill="var(--leaf)"/><path d="M16 3v26M3 16h26" stroke="currentColor" stroke-width="2"/></svg>`;
 
 /* ---------- catálogo por defecto ---------- */
@@ -692,8 +722,10 @@ const CATCOL = {
 const unidad = c => UNIDADES.find(u => u[0] === c.unidadBase) || UNIDADES[0];
 const unidadCorta = c => unidad(c)[1];
 const unidadPlural = c => unidad(c)[2];
-const APP_VERSION = 'V 1.11';
+const APP_VERSION = 'V 1.13';
 const CHANGELOG = [
+  ['V 1.13', 'Color de acento institucional en la marca (pestaña activa, menú y títulos del PDF); el logo se muestra sobre fondo blanco para que se lea también en modo oscuro.'],
+  ['V 1.12', 'Marca personalizable desde config.js (nombre, institución, logo, colores, encabezado del PDF y normativa por defecto) para usar la misma plataforma en distintas instituciones; mención de licencia de uso cuando se personaliza.'],
   ['V 1.11', 'Perfil de usuario con nombre, apellido y cargo u ocupación, pedido al registrarse (y una sola vez a las cuentas existentes). En grupos, estudios compartidos y en la sesión se muestra el nombre y el cargo en lugar del correo.'],
   ['V 1.10', 'Estudios compartidos entre usuarios registrados, a elección de su dueño, con permiso de ver o de editar; grupos de trabajo con administradores y miembros para hacer estudios en conjunto; combinación automática de cambios cuando dos personas editan el mismo estudio; modo de solo lectura.'],
   ['V 1.9', 'La pantalla de inicio es solo para iniciar sesión; desde un recuadro se pasa a la pantalla de registro, que pide confirmar la contraseña y aceptar el aviso de privacidad.'],
@@ -758,7 +790,7 @@ const mLabel = (c, m) => 'M-' + pad2(c.muestras.indexOf(m) + 1);
 function newCampaign(){
   return {id:'c' + uid(), nombre:'', tipo:TIPOS[0], entidad:'', municipio:'', provincia:'', responsable:'', revisor:'',
     fechaInicio:today(), fechaFin:'', dias:7, poblacion:null, unidadBase:'habitante', temporada:'Lluviosa',
-    normativa:'Ley 225-20 General de Gestión Integral y Coprocesamiento de Residuos Sólidos y su reglamento (Decreto 320-21), República Dominicana',
+    normativa:BRAND.normativa || 'Ley 225-20 General de Gestión Integral y Coprocesamiento de Residuos Sólidos y su reglamento (Decreto 320-21), República Dominicana',
     objetivo:'', fuentes:[], muestras:[], lab:[], labNoAplica:false, alertasRevisadas:false, qrImpreso:false,
     conclusiones:'', recomendaciones:[], optFotos:true, optRegistro:true, optLab:true, mod:{dens:false, hum:false, ubi:false},
     stage:0, createdAt:Date.now(), updatedAt:Date.now(), informeAt:null, ejemplo:false};
@@ -1730,8 +1762,8 @@ function renderShell(){
   const nav = [['panel', I.grid, 'Caracterizaciones'], ...(Store.mode === 'supa' ? [['grupos', I.users, 'Grupos de trabajo']] : []), ['catalogo', I.book, 'Catálogo normativo'], ['ajustes', I.sliders, 'Ajustes']];
   const v = S.ui.view === 'camp' ? 'panel' : S.ui.view;
   const items = cls => nav.map(([k, ic, t]) => `<button class="nv${v === k ? ' on' : ''}" data-act="nav" data-v="${k}"${v === k ? ' aria-current="page"' : ''}>${ic}<span>${cls ? t.split(' ')[0] : t}</span></button>`).join('');
-  $('#rail').innerHTML = `<div class="brand">${logo(36)}<div><b>Cuarteo</b><small>Caracterización de residuos sólidos</small><span class="vtag">${APP_VERSION}</span></div></div><nav aria-label="Secciones">${items(false)}<button class="nv" data-act="scanGlobal">${I.scan}<span>Escanear contenedor</span></button></nav><div class="railfoot">${acctHTML()}<div class="stat" data-status></div><div class="stat" data-scale></div><div class="stat">${I.gauge}<span>Unidades: ${SYS() === 'ING' ? 'sistema inglés' : 'métrico (MKS)'}</span></div></div>`;
-  $('#mtop').innerHTML = `${logo(28)}<b>Cuarteo</b><span class="vtag" style="margin:0">${APP_VERSION}</span>${noauth ? '' : '<div class="stat" data-status></div><button class="ib" data-act="scanGlobal" aria-label="Escanear contenedor" title="Escanear contenedor">' + I.scan + '</button>'}`;
+  $('#rail').innerHTML = `${BRAND.logo ? `<div class="brand col">${brandImg(80)}<div><b>${esc(BRAND.corto)}</b><small>${esc(BRAND.dep || BRAND.sub)}</small><span class="vtag">${APP_VERSION}</span></div></div>` : `<div class="brand">${logo(36)}<div><b>${esc(BRAND.corto)}</b><small>${esc(BRAND.custom ? (BRAND.dep || BRAND.sub) : BRAND.sub)}</small><span class="vtag">${APP_VERSION}</span></div></div>`}<nav aria-label="Secciones">${items(false)}<button class="nv" data-act="scanGlobal">${I.scan}<span>Escanear contenedor</span></button></nav><div class="railfoot">${acctHTML()}<div class="stat" data-status></div><div class="stat" data-scale></div><div class="stat">${I.gauge}<span>Unidades: ${SYS() === 'ING' ? 'sistema inglés' : 'métrico (MKS)'}</span></div></div>`;
+  $('#mtop').innerHTML = `${BRAND.logo ? brandImg(28) : logo(28)}<b>${esc(BRAND.corto)}</b><span class="vtag" style="margin:0">${APP_VERSION}</span>${noauth ? '' : '<div class="stat" data-status></div><button class="ib" data-act="scanGlobal" aria-label="Escanear contenedor" title="Escanear contenedor">' + I.scan + '</button>'}`;
   $('#tabbar').innerHTML = items(true) + `<button class="nv" data-act="scanGlobal">${I.scan}<span>Escanear</span></button>`;
   drawStatus(); drawScale();
 }
@@ -1739,7 +1771,7 @@ const CH = {};
 function destroyCharts(){ for (const k in CH) { try { CH[k].destroy(); } catch (e) {} delete CH[k]; } }
 function renderMain(){
   destroyCharts(); destroyMaps(); FID = 0; const main = $('#main');
-  if (!S.ready) { main.innerHTML = `<div class="loading">${logo(48)}<p>Abriendo tu espacio de trabajo…</p></div>`; return; }
+  if (!S.ready) { main.innerHTML = `<div class="loading"><span class="spin"></span><p>Abriendo tu espacio de trabajo…</p></div>`; return; }
   const v = S.ui.view;
   if (v === 'camp' && !cur()) S.ui.view = 'panel';
   if (Store.mode === 'setup' || Store.mode === 'login') { main.innerHTML = Store.mode === 'setup' ? viewSetup() : viewLogin(); if (Store.mode === 'setup') fillDiag(); return; }
@@ -1755,7 +1787,7 @@ function hydratePhotos(){ document.querySelectorAll('img[data-photo]').forEach(a
 const PRIV_VERSION = '1.2, octubre de 2026';
 function privConf(){ const c = (window.CUARTEO_CONFIG && window.CUARTEO_CONFIG.privacidad) || {};
   const r = String(c.responsable || '').trim(), m = String(c.contacto || '').trim();
-  return {resp:/tu nombre/i.test(r) ? '' : r, mail:/tu-correo|ejemplo\.com/i.test(m) ? '' : m}; }
+  return {resp:/tu nombre/i.test(r) ? '' : r, mail:/tu-correo|ejemplo\.com|CORREO-INSTITUCIONAL/i.test(m) ? '' : m}; }
 function privacyHTML(){
   const {resp, mail} = privConf(); const who = resp ? `<b>${esc(resp)}</b>` : 'el administrador de esta instalación de Cuarteo';
   const contact = mail ? `<a href="mailto:${esc(mail)}">${esc(mail)}</a>` : 'el administrador que te dio acceso';
@@ -1807,7 +1839,8 @@ function hashFicha(){
   const n = k => { const v = parseFloat(q.get(k)); return isFinite(v) ? v : null; };
   return {id:q.get('cuarteo') || '', c:q.get('c'), n:q.get('n') || '', t:q.get('t') || '', s:q.get('s') || '', b:q.get('b') || '', ub:q.get('ub') || 'habitantes', tu:q.get('tu') || '', la:n('la'), lo:n('lo'), m:q.get('m') || '', p:q.get('p') || '', e:q.get('e') || '', en:q.get('en') || ''};
 }
-const brandHTML = () => `<div class="lgbrand">${logo(52)}<div><h1 class="disp" style="margin:0">Cuarteo</h1><span class="vtag">${APP_VERSION}</span></div></div>`;
+const brandImg = h => BRAND.logo ? `<img class="blogo" src="${esc(BRAND.logo)}" alt="${esc(BRAND.inst || BRAND.nombre)}" style="max-height:${h}px;max-width:100%;width:auto;display:block">` : '';
+const brandHTML = () => BRAND.logo ? `<div class="lgbrand col">${brandImg(76)}<div><h1 class="disp" style="margin:10px 0 0;font-size:clamp(26px,4vw,36px)">${esc(BRAND.nombre)}</h1>${BRAND.inst || BRAND.dep ? `<p class="lede" style="margin:4px 0 0;font-size:15px">${esc([BRAND.dep, BRAND.inst].filter(Boolean).join(', '))}</p>` : ''}<span class="vtag">${APP_VERSION}</span></div></div>` : `<div class="lgbrand">${logo(52)}<div><h1 class="disp" style="margin:0">${esc(BRAND.corto)}</h1><span class="vtag">${APP_VERSION}</span></div></div>`;
 function viewSetup(){
   return `<div class="login">${brandHTML()}<p class="lede">Conecta Cuarteo con tu proyecto de Supabase para guardar los estudios en la nube. Los datos están en Supabase, en Project Settings, API.</p>
     ${Store.sbError ? `<p class="note" style="color:var(--red)">No se pudo conectar: ${esc(Store.sbError)}</p>` : ''}
@@ -2240,7 +2273,7 @@ function viewAjustes(){
   <div class="blk"><h3>Respaldos</h3><p class="note">${esc(storeLabel())}. El respaldo incluye estudios, catálogo y ajustes, y si quieres también las fotos. Sirve para pasar tus datos de Claude a Supabase: descárgalo con fotos en Claude y restáuralo en la versión de GitHub.</p>
     <div class="acts"><button class="btn ghost" data-act="backup">${I.dl} Descargar respaldo</button><button class="btn ghost" data-act="importJSON">${I.ul} Restaurar o importar</button>${!S.campanas.some(c => c.ejemplo) ? `<button class="btn ghost" data-act="loadExample">Cargar ejemplo</button>` : ''}</div></div>
   <div class="blk"><h3>Apariencia</h3><div class="segs"><button class="seg${t === '' ? ' on' : ''}" data-act="theme" data-v="">Según el sistema</button><button class="seg${t === 'light' ? ' on' : ''}" data-act="theme" data-v="light">Claro</button><button class="seg${t === 'dark' ? ' on' : ''}" data-act="theme" data-v="dark">Oscuro</button></div></div>
-  <div class="blk"><h3>Acerca de Cuarteo ${APP_VERSION}</h3><p class="note">La numeración indica el año del software y la versión dentro de ese año: ${APP_VERSION} es la versión ${APP_VERSION.split('.')[1]} del año ${APP_VERSION.replace('V ', '').split('.')[0]} del software.</p>
+  <div class="blk"><h3>Acerca de ${esc(BRAND.nombre)} ${APP_VERSION}</h3>${BRAND.custom ? `<p class="note">Plataforma basada en Cuarteo${BRAND.autor ? ', software de ' + esc(BRAND.autor) : ''}, utilizada ${BRAND.inst ? 'por ' + esc(BRAND.inst) + ' ' : ''}bajo licencia de uso. El software y sus actualizaciones pertenecen a su autor; los datos registrados pertenecen a la institución.</p>` : ''}<p class="note">La numeración indica el año del software y la versión dentro de ese año: ${APP_VERSION} es la versión ${APP_VERSION.split('.')[1]} del año ${APP_VERSION.replace('V ', '').split('.')[0]} del software.</p>
     <ul class="changes">${CHANGELOG.map(([v, t]) => `<li><b>${v}</b><span>${t}</span></li>`).join('')}</ul></div>`;
 }
 
@@ -2322,11 +2355,11 @@ async function exportPDF(c){
   if (typeof doc.autoTable !== 'function' && window.jspdf_autotable?.applyPlugin) window.jspdf_autotable.applyPlugin(jsPDF);
   ensureMod(c);
   const R = calc(c), A = alertas(c, R); const P = pdfSafe; const W = 210, H = 297, M = 18, CW = W - 2 * M;
-  const INK = [20, 48, 42], LEAF = [30, 122, 87], TXT = [42, 52, 49]; const u = gpcU(c); const kg = uL('m');
+  const INK = BRAND.oscuro ? hexRGB(BRAND.oscuro) : [20, 48, 42], LEAF = BRAND.primario ? hexRGB(BRAND.primario) : [30, 122, 87], TXT = [42, 52, 49]; const u = gpcU(c); const kg = uL('m');
   const dOn = modOn(c, 'dens'), hOn = modOn(c, 'hum'), uOn = modOn(c, 'ubi');
   let y = 0;
   const need = h => { if (y + h > H - 20) { doc.addPage(); y = 22; } };
-  const H1 = (t) => { need(18); y += 2; doc.setFont('helvetica', 'bold'); doc.setFontSize(13); doc.setTextColor(...INK); doc.text(P(t), M, y); y += 2.6; doc.setDrawColor(...LEAF); doc.setLineWidth(.8); doc.line(M, y, M + 16, y); y += 6.5; };
+  const H1 = (t) => { need(18); y += 2; doc.setFont('helvetica', 'bold'); doc.setFontSize(13); doc.setTextColor(...INK); doc.text(P(t), M, y); y += 2.6; doc.setDrawColor(...(BRAND.acento ? hexRGB(BRAND.acento) : LEAF)); doc.setLineWidth(.8); doc.line(M, y, M + 16, y); y += 6.5; };
   const H2 = t => { need(12); doc.setFont('helvetica', 'bold'); doc.setFontSize(10.5); doc.setTextColor(...INK); doc.text(P(t), M, y); y += 5.5; };
   const PARA = t => { if (!t) return; doc.setFont('helvetica', 'normal'); doc.setFontSize(10); doc.setTextColor(...TXT);
     for (const para of String(t).split(/\n+/)) { if (!para.trim()) continue; for (const ln of doc.splitTextToSize(P(para.trim()), CW)) { need(5.2); doc.text(ln, M, y); y += 5; } y += 2; } };
@@ -2338,9 +2371,10 @@ async function exportPDF(c){
       const lines = [[pts[0][0] - x, pts[0][1] - yy]]; for (let i = 1; i < pts.length; i++) lines.push([pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]]); lines.push([x - pts[pts.length - 1][0], yy - pts[pts.length - 1][1]]); doc.lines(lines, x, yy, [1, 1], 'F', true); };
     sg(180); sg(0); doc.line(x - r, yy, x + r, yy); doc.line(x, yy - r, x, yy + r); };
   // portada
-  doc.setFillColor(...INK); doc.rect(0, 0, W, 66, 'F'); qlogo(M + 6, 17, 6);
-  doc.setTextColor(255); doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.text(P(`Cuarteo ${APP_VERSION}`), M + 16, 16);
-  doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.text(P('Caracterización de residuos sólidos'), M + 16, 20.5);
+  doc.setFillColor(...INK); doc.rect(0, 0, W, 66, 'F'); let brandX = M + 16;
+  if (BRAND.logoData) { const lh = 14, lw = Math.min(56, lh * BRAND.logoRatio); doc.setFillColor(255, 255, 255); doc.roundedRect(M - 2, 8, lw + 4, lh + 4, 1.5, 1.5, 'F'); doc.addImage(BRAND.logoData, 'PNG', M, 10, lw, lh); brandX = M + lw + 7; } else qlogo(M + 6, 17, 6);
+  doc.setTextColor(255); doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.text(P(BRAND.custom ? BRAND.nombre : `Cuarteo ${APP_VERSION}`), brandX, 15.5);
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.text(P(BRAND.custom ? [BRAND.dep, BRAND.inst].filter(Boolean).join(', ') || BRAND.sub : 'Caracterización de residuos sólidos'), brandX, 20.5);
   doc.setFont('helvetica', 'bold'); doc.setFontSize(20); doc.text(P('Informe de caracterización de residuos sólidos'), M, 38);
   doc.setFont('helvetica', 'normal'); doc.setFontSize(11.5); const tl = doc.splitTextToSize(P(c.nombre || 'Estudio sin título'), CW); doc.text(tl.slice(0, 2), M, 47);
   doc.setFontSize(9); doc.setTextColor(200, 225, 214); doc.text(P(`${c.entidad || ''}${c.entidad && c.municipio ? ', ' : ''}${c.municipio || ''}   |   Emitido el ${fdate(today())}   |   Unidades: ${SYSNAME()}`), M, 59);
@@ -2434,7 +2468,7 @@ async function exportPDF(c){
   const total = doc.getNumberOfPages();
   for (let i = 1; i <= total; i++) { doc.setPage(i); doc.setFont('helvetica', 'normal'); doc.setFontSize(7.8); doc.setTextColor(120);
     if (i > 1) { doc.setDrawColor(...LEAF); doc.setLineWidth(.5); doc.line(M, 12, W - M, 12); doc.text(P(trunc(c.nombre || 'Informe de caracterización', 90)), M, 9.5); }
-    doc.text(P(`Generado con Cuarteo ${APP_VERSION} el ${fdate(today())}`), M, H - 9); doc.text(`Página ${i} de ${total}`, W - M, H - 9, {align:'right'}); }
+    doc.text(P(`Generado con ${brandSoftware()} el ${fdate(today())}`), M, H - 9); doc.text(`Página ${i} de ${total}`, W - M, H - 9, {align:'right'}); }
   const ok = await saveFile(`informe-${slug(c.nombre)}.pdf`, doc.output('blob'));
   if (ok) { c.informeAt = Date.now(); c.informeVersion = APP_VERSION; scheduleSave(c); if (S.ui.view === 'camp') renderMain(); }
 }
@@ -2465,7 +2499,7 @@ async function exportXLSX(c){
   toast('Preparando la hoja de cálculo…'); await libs('xlsx'); ensureMod(c); const R = calc(c), A = alertas(c, R); const u = gpcU(c); const kg = uL('m');
   const dOn = modOn(c, 'dens'), hOn = modOn(c, 'hum'), uOn = modOn(c, 'ubi'); const r = (q, v, d) => rnd(toU(q, v), d);
   const wb = XLSX.utils.book_new(); const sh = (name, rows, widths) => { const ws = XLSX.utils.aoa_to_sheet(rows); if (widths) ws['!cols'] = widths.map(w => ({wch:w})); XLSX.utils.book_append_sheet(wb, ws, name); };
-  sh('Resumen', [['Software', `Cuarteo ${APP_VERSION}`], ['Sistema de unidades', cap1(SYSNAME())], ['Estudio', c.nombre], ['Tipo de generador', c.tipo], ['Entidad', c.entidad], ['Municipio', c.municipio], ['Provincia', c.provincia], ['Inicio', c.fechaInicio], ['Fin', c.fechaFin], ['Días', c.dias], ['Temporada', c.temporada], ['Responsable', c.responsable], ['Normativa', c.normativa], [],
+  sh('Resumen', [['Software', brandSoftware()], ['Sistema de unidades', cap1(SYSNAME())], ['Estudio', c.nombre], ['Tipo de generador', c.tipo], ['Entidad', c.entidad], ['Municipio', c.municipio], ['Provincia', c.provincia], ['Inicio', c.fechaInicio], ['Fin', c.fechaFin], ['Días', c.dias], ['Temporada', c.temporada], ['Responsable', c.responsable], ['Normativa', c.normativa], [],
     ['Indicador', 'Valor', 'Unidad'], ['GPC', r('m', R.gpc, 4), u], ['Generación proyectada', r('t', R.genProy, 3), uL('t')], ...(dOn ? [['Densidad suelta', r('d', R.ds, 1), uL('d')], ['Densidad compactada', r('d', R.dc, 1), uL('d')]] : []), ...(hOn ? [['Humedad', rnd(R.hum, 2), '%']] : []),
     ['Orgánico', rnd(R.orgPct, 2), '%'], ['Aprovechable', rnd(R.aprovPct, 2), '%'], ['Peligroso', rnd(R.pelPct, 2), '%'], ['Manejo especial', rnd(R.espPct, 2), '%'], ['Peso clasificado', r('m', R.total, 3), kg]], [28, 50, 16]);
   sh('Composición', [['Componente', 'Sistema', 'Código', 'Naturaleza', 'Aprovechable', 'Peligrosidad', `Peso (${kg})`, '%'], ...R.comp.map(x => { const cd = codeByRef(x.k.codigo); return [x.k.nombre, cd?.sis || '', cd?.cod || '', x.k.nat, x.k.aprov ? 'Sí' : 'No', x.k.pel, r('m', x.peso, 3), rnd(x.pct, 2)]; })], [40, 8, 12, 12, 12, 16, 12, 8]);
@@ -2484,7 +2518,7 @@ async function exportXLSX(c){
 function erpJSON(c){
   const R = calc(c), A = alertas(c, R);
   ensureMod(c);
-  return {esquema:'cuarteo.caracterizacion', version:1, software:`Cuarteo ${APP_VERSION}`, unidades:'SI (kg, L, kg/m³, °C, kcal/kg)', secciones:{densidad:modOn(c, 'dens'), humedad:modOn(c, 'hum'), ubicacion_evidencia:modOn(c, 'ubi')}, exportado:new Date().toISOString(),
+  return {esquema:'cuarteo.caracterizacion', version:1, software:brandSoftware(), unidades:'SI (kg, L, kg/m³, °C, kcal/kg)', secciones:{densidad:modOn(c, 'dens'), humedad:modOn(c, 'hum'), ubicacion_evidencia:modOn(c, 'ubi')}, exportado:new Date().toISOString(),
     estudio:{id:c.id, nombre:c.nombre, tipo:c.tipo, entidad:c.entidad, municipio:c.municipio, provincia:c.provincia, responsable:c.responsable, revisor:c.revisor, fecha_inicio:c.fechaInicio, fecha_fin:c.fechaFin, dias:c.dias, temporada:c.temporada, unidad_base:c.unidadBase, poblacion:num(c.poblacion), normativa:c.normativa, objetivo:c.objetivo},
     indicadores:{gpc_kg_unidad_dia:rnd(R.gpc, 4), generacion_proyectada_t_dia:rnd(R.genProy, 3), densidad_suelta_kg_m3:rnd(R.ds, 1), densidad_compactada_kg_m3:rnd(R.dc, 1), humedad_pct:rnd(R.hum, 2), organico_pct:rnd(R.orgPct, 2), aprovechable_pct:rnd(R.aprovPct, 2), peligroso_pct:rnd(R.pelPct, 2), manejo_especial_pct:rnd(R.espPct, 2), peso_clasificado_kg:rnd(R.total, 3)},
     composicion:R.comp.map(x => { const cd = codeByRef(x.k.codigo); return {componente_id:x.k.id, componente:x.k.nombre, codigo:cd?.cod || null, sistema:cd?.sis || null, naturaleza:x.k.nat, aprovechable:!!x.k.aprov, peligrosidad:x.k.pel, peso_kg:rnd(x.peso, 3), porcentaje:rnd(x.pct, 2)}; }),
@@ -2726,7 +2760,7 @@ const ACT = {
   expJSON:() => { const c = cur(); saveFile(`caracterizacion-${slug(c.nombre)}.json`, JSON.stringify(erpJSON(c), null, 2)); },
   expAllCSV:() => { const rows = []; S.campanas.forEach((c, i) => { const r = registroRows(c); rows.push(...(i === 0 ? r : r.slice(1))); }); if (rows.length < 2) { toast('Aún no hay pesos registrados.'); return; } saveFile('registro-todos-los-estudios.csv', toCSV(rows)); },
   backup:() => openModal('Descargar respaldo', '<p>¿Incluir las fotos? El archivo será más pesado, pero te permite pasar la evidencia fotográfica a otro espacio, por ejemplo de Claude a la versión de GitHub.</p>', `<button class="btn ghost" data-act="backupGo" data-f="0">Sin fotos</button><button class="btn" data-act="backupGo" data-f="1">Con fotos</button>`),
-  backupGo:async el => { closeModal(); const out = {app:'cuarteo', version:2, software:`Cuarteo ${APP_VERSION}`, exportado:new Date().toISOString(), cfg:S.cfg, catalogo:S.catalogo, campanas:S.campanas.filter(isOwner).map(stripPriv)};
+  backupGo:async el => { closeModal(); const out = {app:'cuarteo', version:2, software:brandSoftware(), exportado:new Date().toISOString(), cfg:S.cfg, catalogo:S.catalogo, campanas:S.campanas.filter(isOwner).map(stripPriv)};
     if (el.dataset.f === '1') { toast('Reuniendo fotos…'); const fotos = {}; for (const c of S.campanas) for (const id of photoIds(c)) { const d = await Store.getPhoto(id); if (d) fotos[id] = d; } out.fotos = fotos; }
     saveFile(`respaldo-cuarteo-${today()}.json`, JSON.stringify(out)); },
   addComp:() => { const k = {id:'k' + uid(), nombre:'Nuevo componente', nat:'Inorgánico', aprov:false, pel:'No peligroso', estado:'Sólido', codigo:'', padre:'', color:'#' + Math.floor(Math.random() * 0xAAAAAA + 0x222222).toString(16).padStart(6, '0')}; S.catalogo.componentes.push(k); scheduleCfg(); renderMain(); },
@@ -2830,7 +2864,8 @@ if (window.matchMedia) window.matchMedia('(prefers-color-scheme: dark)').addEven
 (function boot(){
   const th = lsGet('cuarteo.theme'); if (th) document.documentElement.dataset.theme = th;
   renderShell(); renderMain();
-  Store.init().catch(e => console.warn(e)).finally(() => {
+  Store.init().catch(e => console.warn(e)).finally(async () => {
+    loadBrand(); await prepLogo();
     S.ready = true; render(); if (S.migrated && Store.mode !== 'login' && Store.mode !== 'setup') { S.migrated = false; scheduleCfg(); }
     postLoginChecks(); window.addEventListener('hashchange', () => { if (Store.mode === 'login') renderMain(); else checkLink(); });
     setTimeout(() => tilesOK(), 800);
