@@ -6,6 +6,7 @@
 window.CUARTEO_CONFIG = {
   supabaseUrl: 'https://kalzxqtnmijhgydhakou.supabase.co',
   supabaseAnonKey: 'sb_publishable_ASmEUhq8iGxFZPCkcxvaZw_Vx_iHkHv',
+  cartoKey: 'cb1_4fp0_1_68816e59ee35202a78f22a64',
    privacidad: {
     responsable: 'Ministerio de Medio Ambiente y Recursos Naturales, Dirección de Gestión Integral de Residuos Sólidos',
     contacto: 'sofia.qureshi@ambiente.gob.do'
